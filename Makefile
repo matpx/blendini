@@ -1,15 +1,22 @@
 
-RAYLIB_SRC = raylib/src/
+RAYLIB_PATH = raylib/src/
+OBJS = blendini.o rjm.o imgui/imgui.o imgui/imgui_demo.o imgui/imgui_draw.o imgui/imgui_tables.o imgui/imgui_widgets.o rlImGui/rlImGui.o
 
-blendini: blendini.cpp $(RAYLIB_SRC)libraylib.a
-	$(CXX) -o blendini blendini.cpp -std=c++20 -Wall -Wextra -I$(RAYLIB_SRC) $(RAYLIB_SRC)libraylib.a
+blendini: $(OBJS) $(RAYLIB_PATH)libraylib.a $(IMGUI_SRC)
+	$(CXX) -o blendini $^ 
 
-$(RAYLIB_SRC)libraylib.a:
-	$(MAKE) -C $(RAYLIB_SRC)
+FLAGS = -std=c++20 -Wall -Wextra -I$(RAYLIB_PATH) -Irjm/ -Iimgui/ -IrlImGui/
+
+%.o: %.cpp
+	$(CXX) -o $@ -c $^ $(FLAGS)
+
+$(RAYLIB_PATH)libraylib.a:
+	$(MAKE) -C $(RAYLIB_PATH)
 
 .PHONY: clean
 
 clean:
 	$(RM) blendini blendini.exe
-	$(MAKE) -C $(RAYLIB_SRC) clean
+	$(RM) *.o imgui/*.o rlImGui/*.o
+	$(MAKE) -C $(RAYLIB_PATH) clean
 

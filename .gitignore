@@ -1,4 +1,7 @@
 /.cache/
 /blendini
 /blendini.exe
+/*.o
+/rlImGui/*.o
 /compile_commands.json
+/imgui.ini

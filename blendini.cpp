@@ -1,4 +1,6 @@
+#include <imgui.h>
 #include <raylib.h>
+#include <rlImGui.h>
 
 int main(void) {
   const int screenWidth = 1920;
@@ -6,10 +8,12 @@ int main(void) {
 
   SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(screenWidth, screenHeight,
-             "raylib [core] example - 3d camera free");
+             "Blendini");
 
   SetTargetFPS(60);
-  EnableEventWaiting();
+  // EnableEventWaiting();
+
+  rlImGuiSetup(true);
 
   Camera3D camera = {
       .position = Vector3{10.0f, 10.0f, 10.0f},
@@ -22,10 +26,7 @@ int main(void) {
   const Vector3 cubePosition = {0.0f, 0.0f, 0.0f};
 
   while (!WindowShouldClose()) {
-    UpdateCamera(&camera, CAMERA_FREE);
-
-    if (IsKeyPressed('Z'))
-      camera.target = (Vector3){0.0f, 0.0f, 0.0f};
+    UpdateCamera(&camera, CAMERA_PERSPECTIVE);
 
     BeginDrawing();
 
@@ -40,17 +41,17 @@ int main(void) {
 
     EndMode3D();
 
-    DrawRectangle(10, 10, 320, 93, Fade(SKYBLUE, 0.5f));
-    DrawRectangleLines(10, 10, 320, 93, BLUE);
+    rlImGuiBegin();
 
-    DrawText("Free camera default controls:", 20, 20, 10, BLACK);
-    DrawText("- Mouse Wheel to Zoom in-out", 40, 40, 10, DARKGRAY);
-    DrawText("- Mouse Wheel Pressed to Pan", 40, 60, 10, DARKGRAY);
-    DrawText("- Z to zoom to (0, 0, 0)", 40, 80, 10, DARKGRAY);
+    ImGui::Begin("My First Tool", nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::End();
+
+    rlImGuiEnd();
 
     EndDrawing();
   }
 
+  rlImGuiShutdown();
   CloseWindow();
 
   return 0;
