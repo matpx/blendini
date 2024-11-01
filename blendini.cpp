@@ -1,7 +1,7 @@
-#include <imgui.h>
+#include <imgui/imgui.h>
 #include <raylib.h>
-#include <rjm_raytrace.h>
-#include <rlImGui.h>
+#include <rjm/rjm_raytrace.h>
+#include <rlImGui/rlImGui.h>
 #include <stdint.h>
 
 #include <vector>
@@ -45,15 +45,6 @@ struct Scene {
   }
 };
 
-constexpr static void set_pixel(Image &dst, const int32_t x, const int32_t y, const Color &color) {
-  assert(dst.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-
-  ((unsigned char *)dst.data)[(y * dst.width + x) * 4] = color.r;
-  ((unsigned char *)dst.data)[(y * dst.width + x) * 4 + 1] = color.g;
-  ((unsigned char *)dst.data)[(y * dst.width + x) * 4 + 2] = color.b;
-  ((unsigned char *)dst.data)[(y * dst.width + x) * 4 + 3] = color.a;
-};
-
 void trace_image(Image &target_image) {
   assert(IsImageReady(target_image));
   assert(target_image.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
@@ -68,7 +59,7 @@ void trace_image(Image &target_image) {
             .a = (uint8_t)255,
         };
 
-        set_pixel(target_image, x, y, c);
+        ImageDrawPixel(&target_image, x, y, c);
       }
     }
   }
