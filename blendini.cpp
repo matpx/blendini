@@ -1,17 +1,16 @@
 #include <imgui/imgui.h>
 #include <raylib.h>
-#include <raymath.h>
 #include <rjm/rjm_raytrace.h>
 #include <rlImGui/rlImGui.h>
 #include <stdint.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 #include <cassert>
 #include <entt/entt.hpp>
 #include <memory>
 #include <span>
 #include <vector>
+
+#include "raymath_eigen.hpp"
 
 struct Scene final : entt::registry {
   Scene() = default;
@@ -50,7 +49,7 @@ struct Scene final : entt::registry {
 
       for (const auto &vertex :
            std::span<Eigen::Vector3f>(reinterpret_cast<Eigen::Vector3f *>(mesh.vertices), mesh.vertexCount)) {
-        vertices.push_back(transform.translation() + transform.rotation() * vertex);
+        vertices.push_back(transform * vertex);
       }
 
       if (mesh.indices != nullptr) {
@@ -180,9 +179,7 @@ int main(void) {
         DrawGrid(10, 1.0f);
 
         for (const auto [entity, transform, mesh] : scene->view<Eigen::Isometry3f, Mesh>().each()) {
-          Eigen::Matrix4f m = transform.matrix().transpose();
-          const Matrix *rl_world = reinterpret_cast<const Matrix *>(m.data());
-          DrawMesh(mesh, default_material, *rl_world);
+          DrawMesh(mesh, default_material, to(transform.matrix()));
         }
 
         EndMode3D();
