@@ -35,6 +35,6 @@ $(RAYLIB_PATH)libraylib.a:
 
 clean:
 	$(RM) blendini blendini.exe
-	$(RM) *.o extern/imgui/*.o extern/rlImGui/*.o
+	$(RM) src/*.o extern/imgui/*.o extern/rlImGui/*.o
 	$(MAKE) -C $(RAYLIB_PATH) clean
 
