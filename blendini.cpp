@@ -5,12 +5,12 @@
 #include <rlImGui/rlImGui.h>
 #include <stdint.h>
 
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <cassert>
-#include <entt/entity/fwd.hpp>
 #include <entt/entt.hpp>
 #include <memory>
 #include <span>
-#include <thread>
 #include <vector>
 
 struct Scene final : entt::registry {
@@ -32,7 +32,7 @@ struct Scene final : entt::registry {
 
   RjmRayTree tree = {};
 
-  std::vector<float> vertices;
+  std::vector<Eigen::Vector3f> vertices;
   std::vector<int32_t> indices;
 
   void rebuild() {
@@ -43,15 +43,18 @@ struct Scene final : entt::registry {
     vertices.clear();
     indices.clear();
 
-    for (const auto [entity, mesh] : view<Mesh>().each()) {
+    for (const auto [entity, transform, mesh] : view<Eigen::Isometry3f, Mesh>().each()) {
       const uint16_t vertex_end = vertices.size();
 
-      for (const auto vertex : std::span<float>(mesh.vertices, mesh.vertexCount * 3)) {
-        vertices.push_back(vertex);
+      static_assert(sizeof(Eigen::Vector3f) == sizeof(float) * 3);
+
+      for (const auto &vertex :
+           std::span<Eigen::Vector3f>(reinterpret_cast<Eigen::Vector3f *>(mesh.vertices), mesh.vertexCount)) {
+        vertices.push_back(transform.translation() + transform.rotation() * vertex);
       }
 
       if (mesh.indices != nullptr) {
-        for (const auto index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
+        for (const auto &index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
           indices.push_back(vertex_end + index);
         }
       } else {
@@ -61,7 +64,7 @@ struct Scene final : entt::registry {
       }
     }
 
-    tree.vtxs = vertices.data();
+    tree.vtxs = reinterpret_cast<float *>(vertices.data());
     tree.tris = indices.data();
     tree.triCount = indices.size() / 3;
 
@@ -153,6 +156,9 @@ int main(void) {
 
     std::unique_ptr<Scene> scene = std::make_unique<Scene>();
     const entt::entity sphere_entity = scene->create();
+    scene->emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
+    scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 0, 0});
+
     scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->rebuild();
 
@@ -160,23 +166,24 @@ int main(void) {
     Texture2D pathtrace_target = LoadTextureFromImage(pathtrace_image);
 
     Material default_material = LoadMaterialDefault();
-    Matrix identity_matrix = MatrixIdentity();
 
     while (!WindowShouldClose()) {
       UpdateCamera(&camera, CAMERA_ORBITAL);
 
       BeginDrawing();
 
-      ClearBackground(RAYWHITE);
+      ClearBackground(GRAY);
 
       {
         BeginMode3D(camera);
 
         DrawGrid(10, 1.0f);
 
-        // for (const Mesh &mesh : scene->meshes) {
-        //   DrawMesh(mesh, default_material, identity_matrix);
-        // }
+        for (const auto [entity, transform, mesh] : scene->view<Eigen::Isometry3f, Mesh>().each()) {
+          Eigen::Matrix4f m = transform.matrix().transpose();
+          const Matrix *rl_world = reinterpret_cast<const Matrix *>(m.data());
+          DrawMesh(mesh, default_material, *rl_world);
+        }
 
         EndMode3D();
       }
