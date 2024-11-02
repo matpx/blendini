@@ -23,5 +23,5 @@ struct Scene final : entt::registry {
 
   void rebuild();
   void trace_image(BS::thread_pool &pool, const Camera3D &camera, Image &target_image,
-                   const Eigen::Vector2i &pathtrace_image_size);
+                   const Eigen::Vector2i &pathtrace_area);
 };

@@ -51,16 +51,16 @@ void Scene::rebuild() {
 }
 
 void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
-                        const Eigen::Vector2i &pathtrace_image_size) {
+                        const Eigen::Vector2i &pathtrace_area) {
   assert(IsImageReady(target_image));
 
-  std::vector<RjmRay> rays(pathtrace_image_size.x() * pathtrace_image_size.y());
+  std::vector<RjmRay> rays(pathtrace_area.x() * pathtrace_area.y());
 
-  for (int x = 0; x < pathtrace_image_size.x(); x++) {
-    for (int y = 0; y < pathtrace_image_size.y(); y++) {
+  for (int x = 0; x < pathtrace_area.x(); x++) {
+    for (int y = 0; y < pathtrace_area.y(); y++) {
       const Ray camera_ray = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
 
-      rays[x * pathtrace_image_size.x() + y] = {
+      rays[x * pathtrace_area.y() + y] = {
           .org = {camera_ray.position.x, camera_ray.position.y, camera_ray.position.z},
           .dir = {camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z},
           .t = 100,
@@ -83,9 +83,19 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 #endif
 
-  for (int x = 0; x < pathtrace_image_size.x(); x++) {
-    for (int y = 0; y < pathtrace_image_size.y(); y++) {
-      const RjmRay output_ray = rays[x * pathtrace_image_size.x() + y];
+  //   const auto set_pixel = [](Image &target, const int32_t x, const int32_t y, const Color &color) {
+  //     assert(target.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  //     if ((target.data == NULL) || (x < 0) || (x >= target.width) || (y < 0) || (y >= target.height)) return;
+
+  //     ((unsigned char *)target.data)[(y * target.width + x) * 4] = color.r;
+  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 1] = color.g;
+  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 2] = color.b;
+  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 3] = color.a;
+  //   };
+
+  for (int x = 0; x < pathtrace_area.x(); x++) {
+    for (int y = 0; y < pathtrace_area.y(); y++) {
+      const RjmRay output_ray = rays[x * pathtrace_area.y() + y];
 
       const Color c{
           .r = (uint8_t)255,

@@ -48,10 +48,10 @@ int main(void) {
       return power;
     };
 
-    const Eigen::Vector2i pathtrace_image_size = {next_power_of_two(GetScreenWidth()),
-                                                  next_power_of_two(GetScreenHeight())};
+    const Eigen::Vector2i pathtrace_area = {GetScreenWidth(), GetScreenHeight()};
 
-    Image pathtrace_image = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
+    Image pathtrace_image =
+        GenImageColor(next_power_of_two(pathtrace_area.x()), next_power_of_two(pathtrace_area.y()), BLACK);
     Texture2D pathtrace_texture = LoadTextureFromImage(pathtrace_image);
 
     Material default_material = LoadMaterialDefault();
@@ -76,7 +76,7 @@ int main(void) {
       }
 
       {
-        scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_image_size);
+        scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_area);
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
         UpdateTexture(pathtrace_texture, pathtrace_image_colors);
