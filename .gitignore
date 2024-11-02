@@ -1,7 +1,7 @@
 /.cache/
 /compile_commands.json
 
-/*.o
+/src/*.o
 /extern/rlImGui/*.o
 
 /blendini

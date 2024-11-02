@@ -2,10 +2,10 @@
 RAYLIB_PATH += extern/raylib/src/
 
 OBJS += extern/imgui/imgui.o extern/imgui/imgui_demo.o extern/imgui/imgui_draw.o extern/imgui/imgui_tables.o extern/imgui/imgui_widgets.o extern/rlImGui/rlImGui.o
-OBJS += blendini.o rjm.o scene.o
+OBJS += src/blendini.o src/rjm.o src/scene.o
 
 HEADER += extern/rjm/rjm_raytrace.h
-HEADER += raymath_eigen.hpp scene.hpp
+HEADER += src/raymath_eigen.hpp src/scene.hpp
 
 FLAGS += -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen -isystem extern/entt/src -isystem extern/thread-pool/include
 FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
