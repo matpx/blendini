@@ -1,6 +1,38 @@
 #include "scene.hpp"
 
+#include <raylib.h>
+#include <rlgl.h>
+
 #include <BS_thread_pool.hpp>
+
+#include "raymath_eigen.hpp"
+
+using namespace Eigen;
+
+inline static Vector3f screen_to_world_ray(const Vector2i &screenPos, const Vector2i &screenSize,
+                                           const Matrix4f &invViewProj) {
+  // Convert screen position to normalized device coordinates (NDC)
+  const Vector2f ndc{
+      (2.0f * screenPos.x()) / screenSize.x() - 1.0f,
+      1.0f - (2.0f * screenPos.y()) / screenSize.y(),
+  };
+
+  // NDC to homogeneous clip space (z = -1 for near plane and w = 1)
+  const Vector4f nearPointNDC(ndc.x(), ndc.y(), -1.0f, 1.0f);
+  const Vector4f farPointNDC(ndc.x(), ndc.y(), 1.0f, 1.0f);
+
+  // Convert NDC points to world space
+  Vector4f nearPointWorld = invViewProj * nearPointNDC;
+  Vector4f farPointWorld = invViewProj * farPointNDC;
+
+  // Divide by w to get actual 3D coordinates in world space
+  nearPointWorld /= nearPointWorld.w();
+  farPointWorld /= farPointWorld.w();
+
+  // The ray origin is the camera position, which we can get from the view matrix
+  // Assuming the camera is at the origin in view space
+  return (farPointWorld.head<3>() - nearPointWorld.head<3>()).normalized();
+}
 
 Scene::~Scene() {
   if (pathtrace_tree.nodes != nullptr) {
@@ -22,13 +54,12 @@ void Scene::rebuild() {
   pathtrace_vertices.clear();
   pathtrace_indices.clear();
 
-  for (const auto [entity, transform, mesh] : view<Eigen::Isometry3f, Mesh>().each()) {
+  for (const auto [entity, transform, mesh] : view<Isometry3f, Mesh>().each()) {
     const uint16_t last_vertex = pathtrace_vertices.size();
 
-    static_assert(sizeof(Eigen::Vector3f) == sizeof(float) * 3);
+    static_assert(sizeof(Vector3f) == sizeof(float) * 3);
 
-    for (const auto &vertex :
-         std::span<Eigen::Vector3f>(reinterpret_cast<Eigen::Vector3f *>(mesh.vertices), mesh.vertexCount)) {
+    for (const auto &vertex : std::span<Vector3f>(reinterpret_cast<Vector3f *>(mesh.vertices), mesh.vertexCount)) {
       pathtrace_vertices.push_back(transform * vertex);
     }
 
@@ -51,18 +82,26 @@ void Scene::rebuild() {
 }
 
 void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
-                        const Eigen::Vector2i &pathtrace_area) {
+                        const Vector2i &pathtrace_area) {
   assert(IsImageReady(target_image));
+
+  const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
+  const Matrix4f projectionMatrix =
+      perspective<float>(camera.fovy, ((float)pathtrace_area.x() / (float)pathtrace_area.y()), RL_CULL_DISTANCE_NEAR,
+                         RL_CULL_DISTANCE_FAR);
+
+  const Matrix4f invViewProj = (projectionMatrix * viewMatrix).inverse();
+  const Vector3f rayOrigin = viewMatrix.inverse().block<3, 1>(0, 3);
 
   std::vector<RjmRay> rays(pathtrace_area.x() * pathtrace_area.y());
 
   for (int x = 0; x < pathtrace_area.x(); x++) {
     for (int y = 0; y < pathtrace_area.y(); y++) {
-      const Ray camera_ray = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
+      const Vector3f ray = screen_to_world_ray(Vector2i(x, y), pathtrace_area, invViewProj);
 
       rays[x * pathtrace_area.y() + y] = {
-          .org = {camera_ray.position.x, camera_ray.position.y, camera_ray.position.z},
-          .dir = {camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z},
+          .org = {rayOrigin.x(), rayOrigin.y(), rayOrigin.z()},
+          .dir = {ray.x(), ray.y(), ray.z()},
           .t = 100,
           .hit = 0,
           .u = 0,

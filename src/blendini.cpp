@@ -68,9 +68,9 @@ int main(void) {
 
         DrawGrid(10, 1.0f);
 
-        for (const auto [entity, transform, mesh] : scene->view<Eigen::Isometry3f, Mesh>().each()) {
-          DrawMesh(mesh, default_material, to(transform.matrix()));
-        }
+        // for (const auto [entity, transform, mesh] : scene->view<Eigen::Isometry3f, Mesh>().each()) {
+        //   DrawMesh(mesh, default_material, Eigen::tr(transform.matrix()));
+        // }
 
         EndMode3D();
       }
