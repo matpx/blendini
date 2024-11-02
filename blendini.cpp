@@ -1,9 +1,13 @@
 #include <imgui/imgui.h>
 #include <raylib.h>
+#include <raymath.h>
 #include <rjm/rjm_raytrace.h>
 #include <rlImGui/rlImGui.h>
 #include <stdint.h>
 
+#include <cassert>
+#include <memory>
+#include <span>
 #include <vector>
 
 struct Scene {
@@ -11,63 +15,94 @@ struct Scene {
   Scene(const Scene &) = delete;
   Scene(Scene &&) = delete;
 
+  ~Scene() {
+    // for (const Mesh &mesh : meshes) {
+    //   if (mesh.vaoId > 0) {
+    //     UnloadMesh(mesh);
+    //   }
+    // }
+  }
+
   std::vector<Mesh> meshes;
   RjmRayTree tree = {};
 
   std::vector<float> vertices;
-  std::vector<float> indices;
+  std::vector<int32_t> indices;
 
   void rebuild() {
+    if (tree.nodes != nullptr) {
+      rjm_freeraytree(&tree);
+    }
+
     vertices.clear();
     indices.clear();
 
     for (const Mesh &mesh : meshes) {
-      const size_t vertex_end = vertices.size();
+      const uint16_t vertex_end = vertices.size();
 
-      for (int i_vertex = 0; i_vertex < mesh.vertexCount; i_vertex++) {
-        vertices.push_back(mesh.vertices[i_vertex]);
+      for (const auto vertex : std::span<float>(mesh.vertices, mesh.vertexCount)) {
+        vertices.push_back(vertex);
       }
 
-      for (int i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
-        indices.push_back(vertex_end + mesh.indices[i_index]);
+      assert(mesh.indices != nullptr);
+
+      for (const auto index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
+        indices.push_back(vertex_end + index);
       }
     }
+
+    tree.vtxs = vertices.data();
+    tree.tris = indices.data();
+    tree.triCount = indices.size() / 3;
 
     rjm_buildraytree(&tree);
   }
 
-  void free() {
-    rjm_freeraytree(&tree);
+  void trace_image(const Camera3D &camera, Image &target_image) {
+    if (!IsImageReady(target_image)) {
+      target_image = GenImageColor(1024, 1024, BLACK);
+    }
 
-    for (const Mesh &mesh : meshes) {
-      UnloadMesh(mesh);
+    std::vector<RjmRay> rays(target_image.width * target_image.height);
+
+    for (int x = 0; x < target_image.width; x++) {
+      for (int y = 0; y < target_image.height; y++) {
+        const Ray r = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
+
+        rays[x * target_image.width + y] = {
+            .org = {r.position.x, r.position.y, r.position.z},
+            .dir = {r.direction.x, r.direction.y, r.direction.z},
+            .t = 1000,
+            .hit = 0,
+            .u = 0,
+            .v = 0,
+            .visibility = 0,
+        };
+      }
+
+      rjm_raytrace(&tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+
+      for (int x = 0; x < target_image.width; x++) {
+        for (int y = 0; y < target_image.height; y++) {
+          const RjmRay r = rays[x * target_image.width + y];
+
+          const Color c{
+              .r = (uint8_t)255,
+              .g = (uint8_t)0,
+              .b = (uint8_t)0,
+              .a = (uint8_t)255,
+          };
+
+          if (r.hit != -1) ImageDrawPixel(&target_image, x, y, c);
+        }
+      }
     }
   }
 };
 
-void trace_image(Image &target_image) {
-  assert(IsImageReady(target_image));
-  assert(target_image.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-
-  for (int x = 0; x < target_image.width; x++) {
-    for (int y = 0; y < target_image.width; y++) {
-      {
-        const Color c{
-            .r = (uint8_t)(x / 4 % 256),
-            .g = (uint8_t)(y / 4 % 256),
-            .b = (uint8_t)(y / 4 % 256),
-            .a = (uint8_t)255,
-        };
-
-        ImageDrawPixel(&target_image, x, y, c);
-      }
-    }
-  }
-}
-
 int main(void) {
-  const int screenWidth = 1920;
-  const int screenHeight = 1080;
+  const int screenWidth = 1024;
+  const int screenHeight = 1024;
 
   SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(screenWidth, screenHeight, "Blendini");
@@ -85,18 +120,21 @@ int main(void) {
       .projection = CAMERA_PERSPECTIVE,
   };
 
-  Scene scene;
-  scene.meshes.push_back(GenMeshCube(1, 1, 1));
-  scene.rebuild();
+  std::unique_ptr<Scene> scene = std::make_unique<Scene>();
+  scene->meshes.push_back(GenMeshCube(1, 1, 1));
+  scene->rebuild();
 
-  Image it = GenImageColor(1024, 1024, RED);
-  trace_image(it);
+  Image it = GenImageColor(1024, 1024, BLACK);
+  scene->trace_image(camera, it);
 
   const Texture2D t = LoadTextureFromImage(it);
   UnloadImage(it);
 
+  // Material default_material = LoadMaterialDefault();
+  // Matrix identity_matrix = MatrixIdentity();
+
   while (!WindowShouldClose()) {
-    UpdateCamera(&camera, CAMERA_PERSPECTIVE);
+    // UpdateCamera(&camera, CAMERA_ORBITAL);
 
     BeginDrawing();
 
@@ -107,10 +145,14 @@ int main(void) {
 
       DrawGrid(10, 1.0f);
 
+      // for (const Mesh &mesh : scene->meshes) {
+      //   DrawMesh(mesh, default_material, identity_matrix);
+      // }
+
       EndMode3D();
     }
 
-    { DrawTexture(t, 0, 0, WHITE); }
+    { DrawTexture(t, 0, 0, {255, 255, 255, 255}); }
 
     {
       rlImGuiBegin();
