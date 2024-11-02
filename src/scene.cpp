@@ -9,29 +9,17 @@
 
 using namespace Eigen;
 
-inline static Vector3f screen_to_world_ray(const Vector2f &screenPos, const Vector2i &screenSize,
-                                           const Matrix4f &invViewProj) {
-  // Convert screen position to normalized device coordinates (NDC)
+inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
+                                           const Matrix4f &inv_view_proj) {
   const Vector2f ndc{
-      (2.0f * screenPos.x()) / screenSize.x() - 1.0f,
-      1.0f - (2.0f * screenPos.y()) / screenSize.y(),
+      (2.0f * screen_pos.x()) / screen_size.x() - 1.0f,
+      1.0f - (2.0f * screen_pos.y()) / screen_size.y(),
   };
 
-  // NDC to homogeneous clip space (z = -1 for near plane and w = 1)
-  const Vector4f nearPointNDC(ndc.x(), ndc.y(), -1.0f, 1.0f);
-  const Vector4f farPointNDC(ndc.x(), ndc.y(), 1.0f, 1.0f);
+  Vector4f direction = inv_view_proj * Vector4f(ndc.x(), ndc.y(), 1.0f, 1.0f);
+  direction /= direction.w();
 
-  // Convert NDC points to world space
-  Vector4f nearPointWorld = invViewProj * nearPointNDC;
-  Vector4f farPointWorld = invViewProj * farPointNDC;
-
-  // Divide by w to get actual 3D coordinates in world space
-  nearPointWorld /= nearPointWorld.w();
-  farPointWorld /= farPointWorld.w();
-
-  // The ray origin is the camera position, which we can get from the view matrix
-  // Assuming the camera is at the origin in view space
-  return (farPointWorld.head<3>() - nearPointWorld.head<3>()).normalized();
+  return direction.head<3>();
 }
 
 Scene::~Scene() {
@@ -90,7 +78,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
       perspective<float>(camera.fovy, ((float)pathtrace_area.x() / (float)pathtrace_area.y()), RL_CULL_DISTANCE_NEAR,
                          RL_CULL_DISTANCE_FAR);
 
-  const Matrix4f invViewProj = (projectionMatrix * viewMatrix).inverse();
+  const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
   const Vector3f rayOrigin = viewMatrix.inverse().block<3, 1>(0, 3);
 
   const auto task = [&](const int32_t start, const int32_t end) {
@@ -100,7 +88,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
 
     for (int i_ray = start; i_ray < end; i_ray++) {
       const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
-      const Vector3f ray = screen_to_world_ray(screen_coords, pathtrace_area, invViewProj);
+      const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
       rays[i_ray - start] = {
           .org = {rayOrigin.x(), rayOrigin.y(), rayOrigin.z()},
