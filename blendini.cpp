@@ -8,6 +8,7 @@
 #include <cassert>
 #include <memory>
 #include <span>
+#include <thread>
 #include <vector>
 
 struct Scene {
@@ -78,7 +79,7 @@ struct Scene {
         rays[x * target_image.width + y] = {
             .org = {r.position.x, r.position.y, r.position.z},
             .dir = {r.direction.x, r.direction.y, r.direction.z},
-            .t = 1000,
+            .t = 100,
             .hit = 0,
             .u = 0,
             .v = 0,
@@ -87,23 +88,25 @@ struct Scene {
       }
     }
 
-    // uint32_t thread_count = std::thread::hardware_concurrency();
-    // std::vector<std::thread> render_threads;
+#if 0
+    const uint32_t thread_count = std::thread::hardware_concurrency();
+    std::vector<std::thread> render_threads;
 
-    // for (uint32_t i_thread = 0; i_thread < thread_count; i_thread++) {
-    //   render_threads.push_back(std::thread(
-    //       [&](const uint32_t thread_id) {
-    //         rjm_raytrace(&tree, rays.size() / thread_count, rays.data() + thread_id * rays.size() / thread_count,
-    //                      RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
-    //       },
-    //       i_thread));
-    // }
+    for (uint32_t i_thread = 0; i_thread < thread_count; i_thread++) {
+      render_threads.push_back(std::thread(
+          [&](const uint32_t thread_id) {
+            rjm_raytrace(&tree, rays.size() / thread_count, rays.data() + thread_id * rays.size() / thread_count,
+                         RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+          },
+          i_thread));
+    }
 
-    // for (std::thread &thread : render_threads) {
-    //   thread.join();
-    // }
-
+    for (std::thread &thread : render_threads) {
+      thread.join();
+    }
+#else
     rjm_raytrace(&tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+#endif
 
     for (int x = 0; x < target_image.width; x++) {
       for (int y = 0; y < target_image.height; y++) {
@@ -111,12 +114,16 @@ struct Scene {
 
         const Color c{
             .r = (uint8_t)255,
-            .g = (uint8_t)0,
-            .b = (uint8_t)0,
+            .g = (uint8_t)(r.u * 255),
+            .b = (uint8_t)(r.v * 255),
             .a = (uint8_t)255,
         };
 
-        if (r.hit != -1) ImageDrawPixel(&target_image, x, y, c);
+        if (r.hit != -1) {
+          ImageDrawPixel(&target_image, x, y, c);
+        } else {
+          ImageDrawPixel(&target_image, x, y, Color{0, 0, 0, 0});
+        }
       }
     }
   }
@@ -144,20 +151,17 @@ int main(void) {
     };
 
     std::unique_ptr<Scene> scene = std::make_unique<Scene>();
-    scene->meshes.push_back(GenMeshSphere(1, 32, 32));
+    scene->meshes.push_back(GenMeshSphere(1, 8, 8));
     scene->rebuild();
 
-    Image it = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
-    scene->trace_image(camera, it);
+    Image pathtrace_image = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
+    Texture2D pathtrace_target = LoadTextureFromImage(pathtrace_image);
 
-    const Texture2D t = LoadTextureFromImage(it);
-    UnloadImage(it);
-
-    // Material default_material = LoadMaterialDefault();
-    // Matrix identity_matrix = MatrixIdentity();
+    Material default_material = LoadMaterialDefault();
+    Matrix identity_matrix = MatrixIdentity();
 
     while (!WindowShouldClose()) {
-      // UpdateCamera(&camera, CAMERA_ORBITAL);
+      UpdateCamera(&camera, CAMERA_ORBITAL);
 
       BeginDrawing();
 
@@ -175,7 +179,15 @@ int main(void) {
         EndMode3D();
       }
 
-      { DrawTexture(t, 0, 0, {255, 255, 255, 255}); }
+      {
+        scene->trace_image(camera, pathtrace_image);
+
+        Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
+        UpdateTexture(pathtrace_target, pathtrace_image_colors);
+        UnloadImageColors(pathtrace_image_colors);
+
+        DrawTexture(pathtrace_target, 0, 0, {255, 255, 255, 255});
+      }
 
       {
         rlImGuiBegin();
@@ -189,7 +201,9 @@ int main(void) {
       EndDrawing();
     }
 
-    UnloadTexture(t);
+    UnloadTexture(pathtrace_target);
+    UnloadImage(pathtrace_image);
+    UnloadMaterial(default_material);
   }
 
   rlImGuiShutdown();
