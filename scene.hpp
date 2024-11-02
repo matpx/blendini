@@ -5,13 +5,11 @@
 
 #include <Eigen/Dense>
 #include <entt/entt.hpp>
-#include <vector>
 
 struct Scene final : entt::registry {
-  RjmRayTree tree = {};
-
-  std::vector<Eigen::Vector3f> vertices;
-  std::vector<int32_t> indices;
+  RjmRayTree pathtrace_tree = {};
+  std::vector<Eigen::Vector3f> pathtrace_vertices;
+  std::vector<int32_t> pathtrace_indices;
 
   Scene() = default;
   Scene(const Scene &) = delete;

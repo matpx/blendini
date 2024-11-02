@@ -1,10 +1,5 @@
-#include <imgui/imgui.h>
-#include <raylib.h>
-#include <rjm/rjm_raytrace.h>
 #include <rlImGui/rlImGui.h>
-#include <stdint.h>
 
-#include <cassert>
 #include <entt/entt.hpp>
 
 #include "raymath_eigen.hpp"
@@ -32,15 +27,16 @@ int main(void) {
     };
 
     std::unique_ptr<Scene> scene = std::make_unique<Scene>();
+
     const entt::entity sphere_entity = scene->create();
+    scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
     scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 0, 0});
 
-    scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->rebuild();
 
     Image pathtrace_image = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
-    Texture2D pathtrace_target = LoadTextureFromImage(pathtrace_image);
+    Texture2D pathtrace_texture = LoadTextureFromImage(pathtrace_image);
 
     Material default_material = LoadMaterialDefault();
 
@@ -67,10 +63,10 @@ int main(void) {
         scene->trace_image(camera, pathtrace_image);
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
-        UpdateTexture(pathtrace_target, pathtrace_image_colors);
+        UpdateTexture(pathtrace_texture, pathtrace_image_colors);
         UnloadImageColors(pathtrace_image_colors);
 
-        DrawTexture(pathtrace_target, 0, 0, {255, 255, 255, 255});
+        DrawTexture(pathtrace_texture, 0, 0, {255, 255, 255, 255});
       }
 
       {
@@ -85,7 +81,7 @@ int main(void) {
       EndDrawing();
     }
 
-    UnloadTexture(pathtrace_target);
+    UnloadTexture(pathtrace_texture);
     UnloadImage(pathtrace_image);
     UnloadMaterial(default_material);
   }

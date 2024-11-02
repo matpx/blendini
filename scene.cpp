@@ -1,8 +1,8 @@
 #include "scene.hpp"
 
 Scene::~Scene() {
-  if (tree.nodes != nullptr) {
-    rjm_freeraytree(&tree);
+  if (pathtrace_tree.nodes != nullptr) {
+    rjm_freeraytree(&pathtrace_tree);
   }
 
   for (const auto [entity, mesh] : view<Mesh>().each()) {
@@ -13,39 +13,39 @@ Scene::~Scene() {
 }
 
 void Scene::rebuild() {
-  if (tree.nodes != nullptr) {
-    rjm_freeraytree(&tree);
+  if (pathtrace_tree.nodes != nullptr) {
+    rjm_freeraytree(&pathtrace_tree);
   }
 
-  vertices.clear();
-  indices.clear();
+  pathtrace_vertices.clear();
+  pathtrace_indices.clear();
 
   for (const auto [entity, transform, mesh] : view<Eigen::Isometry3f, Mesh>().each()) {
-    const uint16_t vertex_end = vertices.size();
+    const uint16_t last_vertex = pathtrace_vertices.size();
 
     static_assert(sizeof(Eigen::Vector3f) == sizeof(float) * 3);
 
     for (const auto &vertex :
          std::span<Eigen::Vector3f>(reinterpret_cast<Eigen::Vector3f *>(mesh.vertices), mesh.vertexCount)) {
-      vertices.push_back(transform * vertex);
+      pathtrace_vertices.push_back(transform * vertex);
     }
 
     if (mesh.indices != nullptr) {
       for (const auto &index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
-        indices.push_back(vertex_end + index);
+        pathtrace_indices.push_back(last_vertex + index);
       }
     } else {
       for (int32_t i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
-        indices.push_back(vertex_end + i_index);
+        pathtrace_indices.push_back(last_vertex + i_index);
       }
     }
   }
 
-  tree.vtxs = reinterpret_cast<float *>(vertices.data());
-  tree.tris = indices.data();
-  tree.triCount = indices.size() / 3;
+  pathtrace_tree.vtxs = reinterpret_cast<float *>(pathtrace_vertices.data());
+  pathtrace_tree.tris = pathtrace_indices.data();
+  pathtrace_tree.triCount = pathtrace_indices.size() / 3;
 
-  rjm_buildraytree(&tree);
+  rjm_buildraytree(&pathtrace_tree);
 }
 
 void Scene::trace_image(const Camera3D &camera, Image &target_image) {
@@ -55,11 +55,11 @@ void Scene::trace_image(const Camera3D &camera, Image &target_image) {
 
   for (int x = 0; x < target_image.width; x++) {
     for (int y = 0; y < target_image.height; y++) {
-      const Ray r = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
+      const Ray camera_ray = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
 
       rays[x * target_image.width + y] = {
-          .org = {r.position.x, r.position.y, r.position.z},
-          .dir = {r.direction.x, r.direction.y, r.direction.z},
+          .org = {camera_ray.position.x, camera_ray.position.y, camera_ray.position.z},
+          .dir = {camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z},
           .t = 100,
           .hit = 0,
           .u = 0,
@@ -86,21 +86,21 @@ void Scene::trace_image(const Camera3D &camera, Image &target_image) {
       thread.join();
     }
 #else
-  rjm_raytrace(&tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 #endif
 
   for (int x = 0; x < target_image.width; x++) {
     for (int y = 0; y < target_image.height; y++) {
-      const RjmRay r = rays[x * target_image.width + y];
+      const RjmRay output_ray = rays[x * target_image.width + y];
 
       const Color c{
           .r = (uint8_t)255,
-          .g = (uint8_t)(r.u * 255),
-          .b = (uint8_t)(r.v * 255),
+          .g = (uint8_t)(output_ray.u * 255),
+          .b = (uint8_t)(output_ray.v * 255),
           .a = (uint8_t)255,
       };
 
-      if (r.hit != -1) {
+      if (output_ray.hit != -1) {
         ImageDrawPixel(&target_image, x, y, c);
       } else {
         ImageDrawPixel(&target_image, x, y, Color{0, 0, 0, 0});
