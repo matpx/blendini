@@ -11,10 +11,10 @@ int main(void) {
 
   BS::thread_pool thread_pool;
 
-  SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
+  // SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(screenWidth, screenHeight, "Blendini");
 
-  SetTargetFPS(60);
+  // SetTargetFPS(60);
   // EnableEventWaiting();
 
   rlImGuiSetup(true);
@@ -75,6 +75,7 @@ int main(void) {
       }
 
       {
+        scene->rebuild();
         scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_area);
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
@@ -91,6 +92,8 @@ int main(void) {
         // ImGui::End();
 
         rlImGuiEnd();
+
+        DrawFPS(10, 10);
       }
 
       EndDrawing();

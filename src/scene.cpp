@@ -9,7 +9,8 @@
 
 using namespace Eigen;
 
-inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
+[[nodiscard]]
+inline static Vector3f screen_to_world(const Vector2i &screen_pos, const Vector2i &screen_size,
                                        const Matrix4f &inv_view_proj) {
   const Vector2f ndc{
       (2.0f * screen_pos.x()) / screen_size.x() - 1.0f,
@@ -86,7 +87,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
     std::vector<RjmRay> rays(end - start);
 
     for (int i_ray = start; i_ray < end; i_ray++) {
-      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+      const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
       const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
       rays[i_ray - start] = {
@@ -102,8 +103,16 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
 
     rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
+    const auto set_image_pixel = [](Image &image, const Vector2i &pos, const Color &color) {
+      assert(IsImageReady(image));
+      assert((image.data != NULL) && (pos.x() >= 0) && (pos.x() < image.width) && (pos.y() >= 0) &&
+             (pos.y() < image.height));
+
+      *(reinterpret_cast<Color *>(image.data) + (pos.y() * image.width + pos.x())) = color;
+    };
+
     for (int i_ray = start; i_ray < end; i_ray++) {
-      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+      const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
       const RjmRay &output_ray = rays[i_ray - start];
 
       const Color c{
@@ -114,13 +123,21 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
       };
 
       if (output_ray.hit != -1) {
-        ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
+        set_image_pixel(target_image, screen_coords, c);
       } else {
-        ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
+        set_image_pixel(target_image, screen_coords, Color{0, 0, 0, 0});
       }
+
+      // if (output_ray.hit != -1) {
+      //   ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
+      // } else {
+      //   ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
+      // }
     }
   };
 
-  thread_pool.detach_blocks<int32_t>(0, pathtrace_area.x() * pathtrace_area.y(), task);
+  const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
+
+  thread_pool.detach_blocks<int32_t>(0, ray_count, task, ray_count / 10000);
   thread_pool.wait();
 }
