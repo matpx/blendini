@@ -7,7 +7,8 @@ OBJS += blendini.o rjm.o scene.o
 HEADER += extern/rjm/rjm_raytrace.h
 HEADER += raymath_eigen.hpp scene.hpp
 
-FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH) -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen -isystem extern/entt/src
+FLAGS += -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen -isystem extern/entt/src -isystem extern/thread-pool/include
+FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
 FLAGS += -march=native
 
 ifdef DEBUG

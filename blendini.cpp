@@ -1,5 +1,6 @@
 #include <rlImGui/rlImGui.h>
 
+#include <BS_thread_pool.hpp>
 #include <entt/entt.hpp>
 
 #include "raymath_eigen.hpp"
@@ -8,6 +9,8 @@
 int main(void) {
   const int screenWidth = 1024;
   const int screenHeight = 1024;
+
+  BS::thread_pool thread_pool;
 
   SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(screenWidth, screenHeight, "Blendini");
@@ -60,7 +63,7 @@ int main(void) {
       }
 
       {
-        scene->trace_image(camera, pathtrace_image);
+        scene->trace_image(thread_pool, camera, pathtrace_image);
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
         UpdateTexture(pathtrace_texture, pathtrace_image_colors);

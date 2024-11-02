@@ -1,5 +1,7 @@
 #include "scene.hpp"
 
+#include <BS_thread_pool.hpp>
+
 Scene::~Scene() {
   if (pathtrace_tree.nodes != nullptr) {
     rjm_freeraytree(&pathtrace_tree);
@@ -48,7 +50,7 @@ void Scene::rebuild() {
   rjm_buildraytree(&pathtrace_tree);
 }
 
-void Scene::trace_image(const Camera3D &camera, Image &target_image) {
+void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image) {
   assert(IsImageReady(target_image));
 
   std::vector<RjmRay> rays(target_image.width * target_image.height);
@@ -69,22 +71,13 @@ void Scene::trace_image(const Camera3D &camera, Image &target_image) {
     }
   }
 
-#if 0
-    const uint32_t thread_count = std::thread::hardware_concurrency();
-    std::vector<std::thread> render_threads;
+#if 1
+  const auto task = [&](const int32_t start, const int32_t end) {
+    rjm_raytrace(&pathtrace_tree, end - start, rays.data() + start, RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+  };
 
-    for (uint32_t i_thread = 0; i_thread < thread_count; i_thread++) {
-      render_threads.push_back(std::thread(
-          [&](const uint32_t thread_id) {
-            rjm_raytrace(&tree, rays.size() / thread_count, rays.data() + thread_id * rays.size() / thread_count,
-                         RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
-          },
-          i_thread));
-    }
-
-    for (std::thread &thread : render_threads) {
-      thread.join();
-    }
+  thread_pool.detach_blocks<int32_t>(0, rays.size(), task);
+  thread_pool.wait();
 #else
   rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 #endif

@@ -6,6 +6,10 @@
 #include <Eigen/Dense>
 #include <entt/entt.hpp>
 
+namespace BS {
+class thread_pool;
+}
+
 struct Scene final : entt::registry {
   RjmRayTree pathtrace_tree = {};
   std::vector<Eigen::Vector3f> pathtrace_vertices;
@@ -18,5 +22,5 @@ struct Scene final : entt::registry {
   ~Scene();
 
   void rebuild();
-  void trace_image(const Camera3D &camera, Image &target_image);
+  void trace_image(BS::thread_pool &pool, const Camera3D &camera, Image &target_image);
 };
