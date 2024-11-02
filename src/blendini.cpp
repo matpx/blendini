@@ -3,7 +3,6 @@
 #include <BS_thread_pool.hpp>
 #include <entt/entt.hpp>
 
-#include "raymath_eigen.hpp"
 #include "scene.hpp"
 
 int main(void) {

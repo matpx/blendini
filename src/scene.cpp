@@ -10,7 +10,7 @@
 using namespace Eigen;
 
 inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
-                                           const Matrix4f &inv_view_proj) {
+                                       const Matrix4f &inv_view_proj) {
   const Vector2f ndc{
       (2.0f * screen_pos.x()) / screen_size.x() - 1.0f,
       1.0f - (2.0f * screen_pos.y()) / screen_size.y(),
