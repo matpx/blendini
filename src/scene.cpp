@@ -16,8 +16,7 @@ inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2
       1.0f - (2.0f * screen_pos.y()) / screen_size.y(),
   };
 
-  Vector4f direction = inv_view_proj * Vector4f(ndc.x(), ndc.y(), 1.0f, 1.0f);
-  direction /= direction.w();
+  const Vector4f direction = inv_view_proj * Vector4f(ndc.x(), ndc.y(), 1.0f, 1.0f);
 
   return direction.head<3>();
 }
@@ -79,7 +78,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
                          RL_CULL_DISTANCE_FAR);
 
   const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
-  const Vector3f rayOrigin = viewMatrix.inverse().block<3, 1>(0, 3);
+  const Vector3f origin = tr(camera.position);
 
   const auto task = [&](const int32_t start, const int32_t end) {
     assert(start < end);
@@ -91,7 +90,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
       const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
       rays[i_ray - start] = {
-          .org = {rayOrigin.x(), rayOrigin.y(), rayOrigin.z()},
+          .org = {origin.x(), origin.y(), origin.z()},
           .dir = {ray.x(), ray.y(), ray.z()},
           .t = 100,
           .hit = 0,
