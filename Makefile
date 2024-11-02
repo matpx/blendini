@@ -13,6 +13,7 @@ FLAGS += -march=native
 
 ifdef DEBUG
 	FLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+	FLAGS += -D_GLIBCXX_ASSERTIONS
 	FLAGS += -Og -g
 
 	RAYLIB_MODE ?= DEBUG

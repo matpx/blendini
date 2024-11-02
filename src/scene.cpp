@@ -9,7 +9,7 @@
 
 using namespace Eigen;
 
-inline static Vector3f screen_to_world_ray(const Vector2i &screenPos, const Vector2i &screenSize,
+inline static Vector3f screen_to_world_ray(const Vector2f &screenPos, const Vector2i &screenSize,
                                            const Matrix4f &invViewProj) {
   // Convert screen position to normalized device coordinates (NDC)
   const Vector2f ndc{
@@ -93,13 +93,16 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   const Matrix4f invViewProj = (projectionMatrix * viewMatrix).inverse();
   const Vector3f rayOrigin = viewMatrix.inverse().block<3, 1>(0, 3);
 
-  std::vector<RjmRay> rays(pathtrace_area.x() * pathtrace_area.y());
+  const auto task = [&](const int32_t start, const int32_t end) {
+    assert(start < end);
 
-  for (int x = 0; x < pathtrace_area.x(); x++) {
-    for (int y = 0; y < pathtrace_area.y(); y++) {
-      const Vector3f ray = screen_to_world_ray(Vector2i(x, y), pathtrace_area, invViewProj);
+    std::vector<RjmRay> rays(end - start);
 
-      rays[x * pathtrace_area.y() + y] = {
+    for (int i_ray = start; i_ray < end; i_ray++) {
+      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+      const Vector3f ray = screen_to_world_ray(screen_coords, pathtrace_area, invViewProj);
+
+      rays[i_ray - start] = {
           .org = {rayOrigin.x(), rayOrigin.y(), rayOrigin.z()},
           .dir = {ray.x(), ray.y(), ray.z()},
           .t = 100,
@@ -109,32 +112,12 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
           .visibility = 0,
       };
     }
-  }
 
-#if 1
-  const auto task = [&](const int32_t start, const int32_t end) {
-    rjm_raytrace(&pathtrace_tree, end - start, rays.data() + start, RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
-  };
+    rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  thread_pool.detach_blocks<int32_t>(0, rays.size(), task);
-  thread_pool.wait();
-#else
-  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
-#endif
-
-  //   const auto set_pixel = [](Image &target, const int32_t x, const int32_t y, const Color &color) {
-  //     assert(target.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-  //     if ((target.data == NULL) || (x < 0) || (x >= target.width) || (y < 0) || (y >= target.height)) return;
-
-  //     ((unsigned char *)target.data)[(y * target.width + x) * 4] = color.r;
-  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 1] = color.g;
-  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 2] = color.b;
-  //     ((unsigned char *)target.data)[(y * target.width + x) * 4 + 3] = color.a;
-  //   };
-
-  for (int x = 0; x < pathtrace_area.x(); x++) {
-    for (int y = 0; y < pathtrace_area.y(); y++) {
-      const RjmRay output_ray = rays[x * pathtrace_area.y() + y];
+    for (int i_ray = start; i_ray < end; i_ray++) {
+      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+      const RjmRay &output_ray = rays[i_ray - start];
 
       const Color c{
           .r = (uint8_t)255,
@@ -144,10 +127,13 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
       };
 
       if (output_ray.hit != -1) {
-        ImageDrawPixel(&target_image, x, y, c);
+        ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
       } else {
-        ImageDrawPixel(&target_image, x, y, Color{0, 0, 0, 0});
+        ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
       }
     }
-  }
+  };
+
+  thread_pool.detach_blocks<int32_t>(0, pathtrace_area.x() * pathtrace_area.y(), task);
+  thread_pool.wait();
 }
