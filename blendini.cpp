@@ -7,8 +7,8 @@
 #include "scene.hpp"
 
 int main(void) {
-  const int screenWidth = 1024;
-  const int screenHeight = 1024;
+  const int screenWidth = 1920;
+  const int screenHeight = 1080;
 
   BS::thread_pool thread_pool;
 
@@ -38,6 +38,19 @@ int main(void) {
 
     scene->rebuild();
 
+    const auto next_power_of_two = [](auto value) -> decltype(value) {
+      decltype(value) power = 1;
+
+      while (power < value) {
+        power *= 2;
+      }
+
+      return power;
+    };
+
+    const Eigen::Vector2i pathtrace_image_size = {next_power_of_two(GetScreenWidth()),
+                                                  next_power_of_two(GetScreenHeight())};
+
     Image pathtrace_image = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
     Texture2D pathtrace_texture = LoadTextureFromImage(pathtrace_image);
 
@@ -63,7 +76,7 @@ int main(void) {
       }
 
       {
-        scene->trace_image(thread_pool, camera, pathtrace_image);
+        scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_image_size);
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
         UpdateTexture(pathtrace_texture, pathtrace_image_colors);

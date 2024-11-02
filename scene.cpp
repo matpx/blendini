@@ -50,16 +50,17 @@ void Scene::rebuild() {
   rjm_buildraytree(&pathtrace_tree);
 }
 
-void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image) {
+void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
+                        const Eigen::Vector2i &pathtrace_image_size) {
   assert(IsImageReady(target_image));
 
-  std::vector<RjmRay> rays(target_image.width * target_image.height);
+  std::vector<RjmRay> rays(pathtrace_image_size.x() * pathtrace_image_size.y());
 
-  for (int x = 0; x < target_image.width; x++) {
-    for (int y = 0; y < target_image.height; y++) {
+  for (int x = 0; x < pathtrace_image_size.x(); x++) {
+    for (int y = 0; y < pathtrace_image_size.y(); y++) {
       const Ray camera_ray = GetMouseRay(Vector2{static_cast<float>(x), static_cast<float>(y)}, camera);
 
-      rays[x * target_image.width + y] = {
+      rays[x * pathtrace_image_size.x() + y] = {
           .org = {camera_ray.position.x, camera_ray.position.y, camera_ray.position.z},
           .dir = {camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z},
           .t = 100,
@@ -82,9 +83,9 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 #endif
 
-  for (int x = 0; x < target_image.width; x++) {
-    for (int y = 0; y < target_image.height; y++) {
-      const RjmRay output_ray = rays[x * target_image.width + y];
+  for (int x = 0; x < pathtrace_image_size.x(); x++) {
+    for (int y = 0; y < pathtrace_image_size.y(); y++) {
+      const RjmRay output_ray = rays[x * pathtrace_image_size.x() + y];
 
       const Color c{
           .r = (uint8_t)255,
