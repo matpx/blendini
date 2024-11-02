@@ -27,7 +27,7 @@ Scene::~Scene() {
     rjm_freeraytree(&pathtrace_tree);
   }
 
-  for (const auto [entity, mesh] : view<Mesh>().each()) {
+  for (const auto [entity, mesh] : view<const Mesh>().each()) {
     if (mesh.vaoId > 0) {
       UnloadMesh(mesh);
     }
@@ -42,7 +42,7 @@ void Scene::rebuild() {
   pathtrace_vertices.clear();
   pathtrace_indices.clear();
 
-  for (const auto [entity, transform, mesh] : view<Isometry3f, Mesh>().each()) {
+  const auto rebuild_mesh = [&](const Isometry3f &transform, const Mesh &mesh) {
     const uint16_t last_vertex = pathtrace_vertices.size();
 
     static_assert(sizeof(Vector3f) == sizeof(float) * 3);
@@ -59,6 +59,16 @@ void Scene::rebuild() {
       for (int32_t i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
         pathtrace_indices.push_back(last_vertex + i_index);
       }
+    }
+  };
+
+  for (const auto [entity, transform, mesh] : view<const Isometry3f, const Mesh>().each()) {
+    rebuild_mesh(transform, mesh);
+  }
+
+  for (const auto [entity, transform, model] : view<const Isometry3f, const Model>().each()) {
+    for (const Mesh &mesh : std::span<Mesh>(model.meshes, model.meshCount)) {
+      rebuild_mesh(transform, mesh);
     }
   }
 

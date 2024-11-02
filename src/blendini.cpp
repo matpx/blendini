@@ -3,6 +3,7 @@
 #include <BS_thread_pool.hpp>
 #include <entt/entt.hpp>
 
+#include "raymath_eigen.hpp"
 #include "scene.hpp"
 
 int main(void) {
@@ -35,7 +36,10 @@ int main(void) {
     scene->emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
     scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 0, 0});
 
-    scene->rebuild();
+    // const Model lantern = LoadModel("Lantern.glb");
+    // const entt::entity lantern_entity = scene->create();
+    // scene->emplace<Model>(lantern_entity, lantern);
+    // scene->emplace<Eigen::Isometry3f>(lantern_entity, Eigen::Isometry3f::Identity());
 
     const auto next_power_of_two = [](auto value) -> decltype(value) {
       decltype(value) power = 1;
@@ -67,8 +71,14 @@ int main(void) {
 
         DrawGrid(10, 1.0f);
 
-        // for (const auto [entity, transform, mesh] : scene->view<Eigen::Isometry3f, Mesh>().each()) {
+        // for (const auto [entity, transform, mesh] : scene->view<const Eigen::Isometry3f, const Mesh>().each()) {
         //   DrawMesh(mesh, default_material, Eigen::tr(transform.matrix()));
+        // }
+
+        // for (const auto [entity, transform, model] : scene->view<const Eigen::Isometry3f, const Model>().each()) {
+        //   DrawModel(model,
+        //             Vector3{transform.translation().x(), transform.translation().y(), transform.translation().z()},
+        //             1.0f, WHITE);
         // }
 
         EndMode3D();
@@ -101,6 +111,7 @@ int main(void) {
 
     UnloadTexture(pathtrace_texture);
     UnloadImage(pathtrace_image);
+    // UnloadModel(lantern);
     UnloadMaterial(default_material);
   }
 
