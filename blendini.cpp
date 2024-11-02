@@ -6,12 +6,14 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <entt/entity/fwd.hpp>
+#include <entt/entt.hpp>
 #include <memory>
 #include <span>
 #include <thread>
 #include <vector>
 
-struct Scene {
+struct Scene final : entt::registry {
   Scene() = default;
   Scene(const Scene &) = delete;
   Scene(Scene &&) = delete;
@@ -21,14 +23,13 @@ struct Scene {
       rjm_freeraytree(&tree);
     }
 
-    for (const Mesh &mesh : meshes) {
+    for (const auto [entity, mesh] : view<Mesh>().each()) {
       if (mesh.vaoId > 0) {
         UnloadMesh(mesh);
       }
     }
   }
 
-  std::vector<Mesh> meshes;
   RjmRayTree tree = {};
 
   std::vector<float> vertices;
@@ -42,7 +43,7 @@ struct Scene {
     vertices.clear();
     indices.clear();
 
-    for (const Mesh &mesh : meshes) {
+    for (const auto [entity, mesh] : view<Mesh>().each()) {
       const uint16_t vertex_end = vertices.size();
 
       for (const auto vertex : std::span<float>(mesh.vertices, mesh.vertexCount * 3)) {
@@ -151,7 +152,8 @@ int main(void) {
     };
 
     std::unique_ptr<Scene> scene = std::make_unique<Scene>();
-    scene->meshes.push_back(GenMeshSphere(1, 8, 8));
+    const entt::entity sphere_entity = scene->create();
+    scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->rebuild();
 
     Image pathtrace_image = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);

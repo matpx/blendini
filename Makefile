@@ -4,7 +4,7 @@ RAYLIB_PATH = extern/raylib/src/
 OBJS = blendini.o rjm.o extern/imgui/imgui.o extern/imgui/imgui_demo.o extern/imgui/imgui_draw.o extern/imgui/imgui_tables.o extern/imgui/imgui_widgets.o extern/rlImGui/rlImGui.o
 HEADER = extern/rjm/rjm_raytrace.h
 
-FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH) -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen
+FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH) -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen -isystem extern/entt/src
 FLAGS += -march=native
 
 ifdef DEBUG
