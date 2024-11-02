@@ -87,7 +87,7 @@ void rjm_freeraytree(RjmRayTree *tree);
 //    along each ray (i.e. the one with the lowest 't' value).
 //    Otherwise, this specifies a visibility cutoff (0-1), and the trace will
 //    stop once the visibility falls below or equal to this value.
-void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata);
+void rjm_raytrace(const RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata);
 
 
 //--- Implementation follows ----------------------------------------------
@@ -236,7 +236,7 @@ void rjm_freeraytree(RjmRayTree *tree)
 	tree->firstLeaf = -1;
 }
 
-void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata)
+void rjm_raytrace(const RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata)
 {
 	// Allocate local SSE structures.
 	RJM_RT_ALIGN float rx[RJM_PACKET_SIZE], ry[RJM_PACKET_SIZE], rz[RJM_PACKET_SIZE];

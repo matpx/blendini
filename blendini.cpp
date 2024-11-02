@@ -16,11 +16,15 @@ struct Scene {
   Scene(Scene &&) = delete;
 
   ~Scene() {
-    // for (const Mesh &mesh : meshes) {
-    //   if (mesh.vaoId > 0) {
-    //     UnloadMesh(mesh);
-    //   }
-    // }
+    if (tree.nodes != nullptr) {
+      rjm_freeraytree(&tree);
+    }
+
+    for (const Mesh &mesh : meshes) {
+      if (mesh.vaoId > 0) {
+        UnloadMesh(mesh);
+      }
+    }
   }
 
   std::vector<Mesh> meshes;
@@ -40,14 +44,18 @@ struct Scene {
     for (const Mesh &mesh : meshes) {
       const uint16_t vertex_end = vertices.size();
 
-      for (const auto vertex : std::span<float>(mesh.vertices, mesh.vertexCount)) {
+      for (const auto vertex : std::span<float>(mesh.vertices, mesh.vertexCount * 3)) {
         vertices.push_back(vertex);
       }
 
-      assert(mesh.indices != nullptr);
-
-      for (const auto index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
-        indices.push_back(vertex_end + index);
+      if (mesh.indices != nullptr) {
+        for (const auto index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
+          indices.push_back(vertex_end + index);
+        }
+      } else {
+        for (int32_t i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
+          indices.push_back(vertex_end + i_index);
+        }
       }
     }
 
@@ -59,9 +67,7 @@ struct Scene {
   }
 
   void trace_image(const Camera3D &camera, Image &target_image) {
-    if (!IsImageReady(target_image)) {
-      target_image = GenImageColor(1024, 1024, BLACK);
-    }
+    assert(IsImageReady(target_image));
 
     std::vector<RjmRay> rays(target_image.width * target_image.height);
 
@@ -79,22 +85,38 @@ struct Scene {
             .visibility = 0,
         };
       }
+    }
 
-      rjm_raytrace(&tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+    // uint32_t thread_count = std::thread::hardware_concurrency();
+    // std::vector<std::thread> render_threads;
 
-      for (int x = 0; x < target_image.width; x++) {
-        for (int y = 0; y < target_image.height; y++) {
-          const RjmRay r = rays[x * target_image.width + y];
+    // for (uint32_t i_thread = 0; i_thread < thread_count; i_thread++) {
+    //   render_threads.push_back(std::thread(
+    //       [&](const uint32_t thread_id) {
+    //         rjm_raytrace(&tree, rays.size() / thread_count, rays.data() + thread_id * rays.size() / thread_count,
+    //                      RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+    //       },
+    //       i_thread));
+    // }
 
-          const Color c{
-              .r = (uint8_t)255,
-              .g = (uint8_t)0,
-              .b = (uint8_t)0,
-              .a = (uint8_t)255,
-          };
+    // for (std::thread &thread : render_threads) {
+    //   thread.join();
+    // }
 
-          if (r.hit != -1) ImageDrawPixel(&target_image, x, y, c);
-        }
+    rjm_raytrace(&tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+
+    for (int x = 0; x < target_image.width; x++) {
+      for (int y = 0; y < target_image.height; y++) {
+        const RjmRay r = rays[x * target_image.width + y];
+
+        const Color c{
+            .r = (uint8_t)255,
+            .g = (uint8_t)0,
+            .b = (uint8_t)0,
+            .a = (uint8_t)255,
+        };
+
+        if (r.hit != -1) ImageDrawPixel(&target_image, x, y, c);
       }
     }
   }
@@ -112,61 +134,63 @@ int main(void) {
 
   rlImGuiSetup(true);
 
-  Camera3D camera = {
-      .position = Vector3{10.0f, 10.0f, 10.0f},
-      .target = Vector3{0.0f, 0.0f, 0.0f},
-      .up = Vector3{0.0f, 1.0f, 0.0f},
-      .fovy = 45.0f,
-      .projection = CAMERA_PERSPECTIVE,
-  };
+  {
+    Camera3D camera = {
+        .position = Vector3{10.0f, 10.0f, 10.0f},
+        .target = Vector3{0.0f, 0.0f, 0.0f},
+        .up = Vector3{0.0f, 1.0f, 0.0f},
+        .fovy = 45.0f,
+        .projection = CAMERA_PERSPECTIVE,
+    };
 
-  std::unique_ptr<Scene> scene = std::make_unique<Scene>();
-  scene->meshes.push_back(GenMeshCube(1, 1, 1));
-  scene->rebuild();
+    std::unique_ptr<Scene> scene = std::make_unique<Scene>();
+    scene->meshes.push_back(GenMeshSphere(1, 32, 32));
+    scene->rebuild();
 
-  Image it = GenImageColor(1024, 1024, BLACK);
-  scene->trace_image(camera, it);
+    Image it = GenImageColor(GetScreenWidth(), GetScreenHeight(), BLACK);
+    scene->trace_image(camera, it);
 
-  const Texture2D t = LoadTextureFromImage(it);
-  UnloadImage(it);
+    const Texture2D t = LoadTextureFromImage(it);
+    UnloadImage(it);
 
-  // Material default_material = LoadMaterialDefault();
-  // Matrix identity_matrix = MatrixIdentity();
+    // Material default_material = LoadMaterialDefault();
+    // Matrix identity_matrix = MatrixIdentity();
 
-  while (!WindowShouldClose()) {
-    // UpdateCamera(&camera, CAMERA_ORBITAL);
+    while (!WindowShouldClose()) {
+      // UpdateCamera(&camera, CAMERA_ORBITAL);
 
-    BeginDrawing();
+      BeginDrawing();
 
-    ClearBackground(RAYWHITE);
+      ClearBackground(RAYWHITE);
 
-    {
-      BeginMode3D(camera);
+      {
+        BeginMode3D(camera);
 
-      DrawGrid(10, 1.0f);
+        DrawGrid(10, 1.0f);
 
-      // for (const Mesh &mesh : scene->meshes) {
-      //   DrawMesh(mesh, default_material, identity_matrix);
-      // }
+        // for (const Mesh &mesh : scene->meshes) {
+        //   DrawMesh(mesh, default_material, identity_matrix);
+        // }
 
-      EndMode3D();
+        EndMode3D();
+      }
+
+      { DrawTexture(t, 0, 0, {255, 255, 255, 255}); }
+
+      {
+        rlImGuiBegin();
+
+        // ImGui::Begin("My First Tool", nullptr, ImGuiWindowFlags_MenuBar);
+        // ImGui::End();
+
+        rlImGuiEnd();
+      }
+
+      EndDrawing();
     }
 
-    { DrawTexture(t, 0, 0, {255, 255, 255, 255}); }
-
-    {
-      rlImGuiBegin();
-
-      // ImGui::Begin("My First Tool", nullptr, ImGuiWindowFlags_MenuBar);
-      // ImGui::End();
-
-      rlImGuiEnd();
-    }
-
-    EndDrawing();
+    UnloadTexture(t);
   }
-
-  UnloadTexture(t);
 
   rlImGuiShutdown();
   CloseWindow();
