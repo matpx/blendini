@@ -230,21 +230,24 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
   }
 
-  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 2);
+  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 3);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
     const float r = std::min(lux_values[i_ray - start] * 255.0f, 255.0f);
 
-    const Color c{
+    const Color new_color{
         .r = (uint8_t)(r),
         .g = (uint8_t)0,
         .b = (uint8_t)0,
         .a = (uint8_t)255,
     };
 
-    ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
+    Color interpolate_color = GetImageColor(target_image, screen_coords.x(), screen_coords.y());
+    interpolate_color.r += (new_color.r - interpolate_color.r) * 0.1f;
+
+    ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), interpolate_color);
   }
 }
 
