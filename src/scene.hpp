@@ -27,8 +27,9 @@ struct Scene final : entt::registry {
   std::vector<float> trace_batch(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays, const int32_t depth);
 
   void first_trace(const Eigen::Vector2i &pathtrace_area, const Eigen::Matrix4f &inv_view_proj,
-                   const Eigen::Vector3f &origin, const int32_t start, const int32_t end, Image &target_image);
+                   const Eigen::Vector3f &origin, const int32_t start, const int32_t end, Image &target_image,
+                   const bool reset);
 
   void trace_image(BS::thread_pool &pool, const Camera3D &camera, Image &target_image,
-                   const Eigen::Vector2i &pathtrace_area);
+                   const Eigen::Vector2i &pathtrace_area, const bool reset);
 };

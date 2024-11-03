@@ -210,7 +210,7 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
 }
 
 void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
-                        const int32_t start, const int32_t end, Image &target_image) {
+                        const int32_t start, const int32_t end, Image &target_image, const bool reset) {
   assert(start < end);
 
   std::vector<RjmRay> rays(end - start);
@@ -245,14 +245,14 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
 
     Color interpolate_color = GetImageColor(target_image, screen_coords.x(), screen_coords.y());
-    interpolate_color.r += (new_color.r - interpolate_color.r) * 0.1f;
+    interpolate_color.r += (new_color.r - interpolate_color.r) * (reset ? 1.0f : 0.1f);
 
     ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), interpolate_color);
   }
 }
 
 void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
-                        const Vector2i &pathtrace_area) {
+                        const Vector2i &pathtrace_area, const bool reset) {
   assert(IsImageReady(target_image));
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
@@ -264,7 +264,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   const Vector3f origin = tr(camera.position);
 
   const auto trace_task = [&](const int32_t start, const int32_t end) {
-    first_trace(pathtrace_area, inv_view_proj, origin, start, end, target_image);
+    first_trace(pathtrace_area, inv_view_proj, origin, start, end, target_image, reset);
   };
 
   const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();

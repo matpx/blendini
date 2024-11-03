@@ -62,9 +62,13 @@ int main(void) {
 
     Material default_material = LoadMaterialDefault();
 
+    bool reset = true;
+
     while (!WindowShouldClose()) {
       if (IsKeyDown(KEY_SPACE)) {
         UpdateCamera(&camera, CAMERA_ORBITAL);
+
+        reset = true;
       }
 
       BeginDrawing();
@@ -91,7 +95,9 @@ int main(void) {
 
       {
         scene->rebuild();
-        scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_area);
+        scene->trace_image(thread_pool, camera, pathtrace_image, pathtrace_area, reset);
+
+        reset = false;
 
         Color *pathtrace_image_colors = LoadImageColors(pathtrace_image);
         UpdateTexture(pathtrace_texture, pathtrace_image_colors);
