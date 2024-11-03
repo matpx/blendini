@@ -9,6 +9,14 @@
 
 using namespace Eigen;
 
+// const auto set_image_pixel = [](Image &image, const Vector2i &pos, const Color &color) {
+//   assert(IsImageReady(image));
+//   assert((image.data != NULL) && (pos.x() >= 0) && (pos.x() < image.width) && (pos.y() >= 0) &&
+//          (pos.y() < image.height));
+
+//   *(reinterpret_cast<Color *>(image.data) + (pos.y() * image.width + pos.x())) = color;
+// };
+
 [[nodiscard]]
 inline static Vector3f screen_to_world(const Vector2i &screen_pos, const Vector2i &screen_size,
                                        const Matrix4f &inv_view_proj) {
@@ -79,6 +87,114 @@ void Scene::rebuild() {
   rjm_buildraytree(&pathtrace_tree);
 }
 
+std::pair<Vector3f, Vector3f> Scene::get_diffuse_ray(const RjmRay &output_ray) const {
+  const std::array<int32_t, 3> triangle_indices = {pathtrace_indices[output_ray.hit * 3],
+                                                   pathtrace_indices[output_ray.hit * 3 + 1],
+                                                   pathtrace_indices[output_ray.hit * 3 + 2]};
+
+  const std::array<Vector3f, 3> triangle_vertices = {pathtrace_vertices[triangle_indices[0]],
+                                                     pathtrace_vertices[triangle_indices[1]],
+                                                     pathtrace_vertices[triangle_indices[2]]};
+
+  const Vector3f normal =
+      (triangle_vertices[1] - triangle_vertices[0]).cross(triangle_vertices[2] - triangle_vertices[0]);
+
+  const Vector3f origin = (1.0f - output_ray.u - output_ray.v) * triangle_vertices[0] +
+                          output_ray.u * triangle_vertices[1] + output_ray.v * triangle_vertices[2];
+
+  const Vector3f offset_origin = origin + normal * 0.01f;
+
+  return {offset_origin, normal};
+}
+
+float Scene::diffuse_trace(const RjmRay &input_ray, const int32_t ray_count, const int32_t steps_left) const {
+  if (steps_left <= 0) {
+    return 0.0;
+  }
+
+  const auto [origin, normal] = get_diffuse_ray(input_ray);
+
+  std::vector<RjmRay> diffuse_rays(ray_count);
+
+  Vector3f diffuse_dir = Vector3f::Random();
+
+  if (diffuse_dir.dot(normal) < 0) {
+    diffuse_dir *= -1;
+  }
+
+  for (int32_t i_diffuse_ray = 0; i_diffuse_ray < ray_count; i_diffuse_ray++) {
+    diffuse_rays[i_diffuse_ray] = {
+        .org = {origin.x(), origin.y(), origin.z()},
+        .dir = {diffuse_dir.x(), diffuse_dir.y(), diffuse_dir.z()},
+        .t = 100,
+        .hit = 0,
+        .u = 0,
+        .v = 0,
+        .visibility = 0,
+    };
+  }
+
+  rjm_raytrace(&pathtrace_tree, diffuse_rays.size(), diffuse_rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+
+  float lux = 0.0f;
+
+  for (const RjmRay &diffuse_ray : diffuse_rays) {
+    if (diffuse_ray.hit == -1) {
+      lux += 100.0f / diffuse_rays.size();
+    } else {
+      for (const RjmRay &previous_ray : diffuse_rays) {
+        lux = diffuse_trace(previous_ray, ray_count / 2, steps_left - 1);
+      }
+    }
+  }
+
+  return lux;
+};
+
+void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
+                        const int32_t start, const int32_t end, Image &target_image) {
+  assert(start < end);
+
+  std::vector<RjmRay> rays(end - start);
+
+  for (int i_ray = start; i_ray < end; i_ray++) {
+    const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+    const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
+
+    rays[i_ray - start] = {
+        .org = {origin.x(), origin.y(), origin.z()},
+        .dir = {ray.x(), ray.y(), ray.z()},
+        .t = 100,
+        .hit = 0,
+        .u = 0,
+        .v = 0,
+        .visibility = 0,
+    };
+  }
+
+  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+
+  for (int i_ray = start; i_ray < end; i_ray++) {
+    const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+    const RjmRay &output_ray = rays[i_ray - start];
+
+    if (output_ray.hit != -1) {
+      float l = diffuse_trace(output_ray, 8, 2);
+
+      const Color c{
+          .r = (uint8_t)l,
+          .g = (uint8_t)0,
+          .b = (uint8_t)0,
+          .a = (uint8_t)255,
+      };
+
+      ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
+    } else {
+      ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
+    }
+  }
+}
+
 void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
                         const Vector2i &pathtrace_area) {
   assert(IsImageReady(target_image));
@@ -91,63 +207,12 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
   const Vector3f origin = tr(camera.position);
 
-  const auto task = [&](const int32_t start, const int32_t end) {
-    assert(start < end);
-
-    std::vector<RjmRay> rays(end - start);
-
-    for (int i_ray = start; i_ray < end; i_ray++) {
-      const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
-      const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
-
-      rays[i_ray - start] = {
-          .org = {origin.x(), origin.y(), origin.z()},
-          .dir = {ray.x(), ray.y(), ray.z()},
-          .t = 100,
-          .hit = 0,
-          .u = 0,
-          .v = 0,
-          .visibility = 0,
-      };
-    }
-
-    rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
-
-    const auto set_image_pixel = [](Image &image, const Vector2i &pos, const Color &color) {
-      assert(IsImageReady(image));
-      assert((image.data != NULL) && (pos.x() >= 0) && (pos.x() < image.width) && (pos.y() >= 0) &&
-             (pos.y() < image.height));
-
-      *(reinterpret_cast<Color *>(image.data) + (pos.y() * image.width + pos.x())) = color;
-    };
-
-    for (int i_ray = start; i_ray < end; i_ray++) {
-      const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
-      const RjmRay &output_ray = rays[i_ray - start];
-
-      const Color c{
-          .r = (uint8_t)255,
-          .g = (uint8_t)(output_ray.u * 255),
-          .b = (uint8_t)(output_ray.v * 255),
-          .a = (uint8_t)255,
-      };
-
-      if (output_ray.hit != -1) {
-        set_image_pixel(target_image, screen_coords, c);
-      } else {
-        set_image_pixel(target_image, screen_coords, Color{0, 0, 0, 0});
-      }
-
-      // if (output_ray.hit != -1) {
-      //   ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
-      // } else {
-      //   ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
-      // }
-    }
+  const auto trace_task = [&](const int32_t start, const int32_t end) {
+    first_trace(pathtrace_area, inv_view_proj, origin, start, end, target_image);
   };
 
   const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
 
-  thread_pool.detach_blocks<int32_t>(0, ray_count, task, ray_count / 10000);
+  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task);
   thread_pool.wait();
 }

@@ -3,7 +3,6 @@
 #include <BS_thread_pool.hpp>
 #include <entt/entt.hpp>
 
-#include "raymath_eigen.hpp"
 #include "scene.hpp"
 
 int main(void) {
@@ -34,7 +33,11 @@ int main(void) {
     const entt::entity sphere_entity = scene->create();
     scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
-    scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 0, 0});
+    scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 1, 0});
+
+    const entt::entity floor_entity = scene->create();
+    scene->emplace<Mesh>(floor_entity, GenMeshPlane(10, 10, 10, 10));
+    scene->emplace<Eigen::Isometry3f>(floor_entity, Eigen::Isometry3f::Identity());
 
     // const Model lantern = LoadModel("Lantern.glb");
     // const entt::entity lantern_entity = scene->create();
