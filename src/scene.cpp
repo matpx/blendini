@@ -5,10 +5,18 @@
 #include <rlgl.h>
 
 #include <BS_thread_pool.hpp>
+#include <random>
 
 #include "raymath_eigen.hpp"
 
 using namespace Eigen;
+
+[[nodiscard]]
+static float rand_thread_safe(const float min, const float max) {
+  static thread_local std::mt19937 generator;
+  std::uniform_real_distribution<float> distribution(min, max);
+  return distribution(generator);
+}
 
 [[nodiscard]]
 inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
@@ -160,7 +168,7 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
     if (rays[i_ray].hit != -1) {
       const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);
 
-      Vector3f dir = Vector3f::Random();
+      Vector3f dir = Vector3f{rand_thread_safe(-1.0f, 1.0f),rand_thread_safe(-1.0f, 1.0f),rand_thread_safe(-1.0f, 1.0f)};
 
       if (dir.dot(ray_normal) < 0) {
         dir *= -1;
@@ -222,7 +230,7 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
-    screen_coords += Vector2f::Random() * 0.5f;
+    screen_coords += Vector2f{rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f)} * 0.5f; // TODO
 
     const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
