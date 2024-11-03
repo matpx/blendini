@@ -27,7 +27,8 @@ struct Scene final : entt::registry {
   std::pair<Eigen::Vector3f, Eigen::Vector3f> get_diffuse_ray(const RjmRay &output_ray) const;
 
   [[nodiscard]]
-  float diffuse_trace(const RjmRay &input_ray, const int32_t ray_count, const int32_t steps_left) const;
+  float diffuse_trace(const Eigen::Vector3f &input_ray_origin, const Eigen::Vector3f &input_ray_normal,
+                      const int32_t steps_left) const;
 
   void first_trace(const Eigen::Vector2i &pathtrace_area, const Eigen::Matrix4f &inv_view_proj,
                    const Eigen::Vector3f &origin, const int32_t start, const int32_t end, Image &target_image);
