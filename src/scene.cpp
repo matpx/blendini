@@ -152,6 +152,8 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
   std::vector<float> lux_values(rays.size());
   std::vector<RjmRay> next_batch(rays.size());
 
+  bool atleast_one_hit = false;
+
   for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
     RjmRay next_ray = {};
 
@@ -175,6 +177,8 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
       };
 
       lux_values[i_ray] = 0.0f;
+
+      atleast_one_hit = true;
     } else {
       lux_values[i_ray] = 0.4f;
     }
@@ -182,7 +186,7 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
     next_batch[i_ray] = next_ray;
   }
 
-  if (depth <= 0) {
+  if (depth <= 0 || !atleast_one_hit) {
     return lux_values;
   }
 
@@ -230,7 +234,7 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
   }
 
-  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 3);
+  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 4);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
