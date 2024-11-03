@@ -10,14 +10,6 @@
 
 using namespace Eigen;
 
-// const auto set_image_pixel = [](Image &image, const Vector2i &pos, const Color &color) {
-//   assert(IsImageReady(image));
-//   assert((image.data != NULL) && (pos.x() >= 0) && (pos.x() < image.width) && (pos.y() >= 0) &&
-//          (pos.y() < image.height));
-
-//   *(reinterpret_cast<Color *>(image.data) + (pos.y() * image.width + pos.x())) = color;
-// };
-
 [[nodiscard]]
 inline static Vector3f screen_to_world(const Vector2i &screen_pos, const Vector2i &screen_size,
                                        const Matrix4f &inv_view_proj) {
@@ -29,6 +21,27 @@ inline static Vector3f screen_to_world(const Vector2i &screen_pos, const Vector2
   const Vector4f direction = inv_view_proj * Vector4f(ndc.x(), ndc.y(), 1.0f, 1.0f);
 
   return direction.head<3>();
+}
+
+[[nodiscard]]
+static std::pair<Vector3f, Vector3f> get_ray(const std::vector<Eigen::Vector3f> &pathtrace_vertices,
+                                             const std::vector<int32_t> &pathtrace_indices, const RjmRay &ray) {
+  const std::array<int32_t, 3> triangle_indices = {pathtrace_indices[ray.hit * 3], pathtrace_indices[ray.hit * 3 + 1],
+                                                   pathtrace_indices[ray.hit * 3 + 2]};
+
+  const std::array<Vector3f, 3> triangle_vertices = {pathtrace_vertices[triangle_indices[0]],
+                                                     pathtrace_vertices[triangle_indices[1]],
+                                                     pathtrace_vertices[triangle_indices[2]]};
+
+  const Vector3f normal =
+      (triangle_vertices[1] - triangle_vertices[0]).cross(triangle_vertices[2] - triangle_vertices[0]);
+
+  const Vector3f origin =
+      (1.0f - ray.u - ray.v) * triangle_vertices[0] + ray.u * triangle_vertices[1] + ray.v * triangle_vertices[2];
+
+  const Vector3f offset_origin = origin + normal * 0.01f;
+
+  return {offset_origin, normal};
 }
 
 Scene::~Scene() {
@@ -88,49 +101,92 @@ void Scene::rebuild() {
   rjm_buildraytree(&pathtrace_tree);
 }
 
-std::pair<Vector3f, Vector3f> Scene::get_diffuse_ray(const RjmRay &output_ray) const {
-  const std::array<int32_t, 3> triangle_indices = {pathtrace_indices[output_ray.hit * 3],
-                                                   pathtrace_indices[output_ray.hit * 3 + 1],
-                                                   pathtrace_indices[output_ray.hit * 3 + 2]};
+// float Scene::diffuse_trace(const Vector3f &input_ray_origin, const Vector3f &input_ray_normal,
+//                            const int32_t steps_left) const {
+//   if (steps_left <= 0) {
+//     return 0.0f;
+//   }
 
-  const std::array<Vector3f, 3> triangle_vertices = {pathtrace_vertices[triangle_indices[0]],
-                                                     pathtrace_vertices[triangle_indices[1]],
-                                                     pathtrace_vertices[triangle_indices[2]]};
+//   Vector3f diffuse_dir = Vector3f::Random();
 
-  const Vector3f normal =
-      (triangle_vertices[1] - triangle_vertices[0]).cross(triangle_vertices[2] - triangle_vertices[0]);
+//   if (diffuse_dir.dot(input_ray_normal) < 0) {
+//     diffuse_dir *= -1;
+//   }
 
-  const Vector3f origin = (1.0f - output_ray.u - output_ray.v) * triangle_vertices[0] +
-                          output_ray.u * triangle_vertices[1] + output_ray.v * triangle_vertices[2];
+//   RjmRay ray = {
+//       .org = {input_ray_origin.x(), input_ray_origin.y(), input_ray_origin.z()},
+//       .dir = {diffuse_dir.x(), diffuse_dir.y(), diffuse_dir.z()},
+//       .t = 100,
+//       .hit = 0,
+//       .u = 0,
+//       .v = 0,
+//       .visibility = 0,
+//   };
 
-  const Vector3f offset_origin = origin + normal * 0.01f;
+//   rjm_raytrace(&pathtrace_tree, 1, &ray, RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  return {offset_origin, normal};
-}
+//   const auto cos_factor = [](const Vector3f &a, const Vector3f &b) -> float {
+//     float dotProduct = a.dot(a);
 
-float Scene::diffuse_trace(const Vector3f &input_ray_origin, const Vector3f &input_ray_normal,
-                           const int32_t steps_left) const {
-  if (steps_left <= 0) {
-    return 0.0f;
+//     float magnitudeA = a.norm();
+//     float magnitudeB = b.norm();
+
+//     return dotProduct / (magnitudeA * magnitudeB);
+//   };
+
+//   float lux = 0.8f;
+
+//   if (ray.hit != -1) {
+//     const auto [diffuse_ray_origin, diffuse_ray_normal] = get_ray(ray);
+//     lux = diffuse_trace(diffuse_ray_origin, diffuse_ray_normal, steps_left - 1);
+//     lux *= std::abs(cos_factor(diffuse_ray_normal, Vector3f{ray.dir[0], ray.dir[1], ray.dir[2]}));
+//   }
+
+//   return lux;
+// };
+
+std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays,
+                                      const int32_t depth) {
+  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+
+  std::vector<float> lux_values(rays.size());
+  std::vector<RjmRay> next_batch(rays.size());
+
+  for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
+    RjmRay next_ray = {};
+
+    if (rays[i_ray].hit != -1) {
+      const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);
+
+      Vector3f dir = Vector3f::Random();
+
+      if (dir.dot(ray_normal) < 0) {
+        dir *= -1;
+      }
+
+      next_ray = {
+          .org = {ray_origin.x(), ray_origin.y(), ray_origin.z()},
+          .dir = {dir.x(), dir.y(), dir.z()},
+          .t = 100,
+          .hit = 0,
+          .u = 0,
+          .v = 0,
+          .visibility = 0,
+      };
+
+      lux_values[i_ray] = 0.0f;
+    } else {
+      lux_values[i_ray] = 0.4f;
+    }
+
+    next_batch[i_ray] = next_ray;
   }
 
-  Vector3f diffuse_dir = Vector3f::Random();
-
-  if (diffuse_dir.dot(input_ray_normal) < 0) {
-    diffuse_dir *= -1;
+  if (depth <= 0) {
+    return lux_values;
   }
 
-  RjmRay ray = {
-      .org = {input_ray_origin.x(), input_ray_origin.y(), input_ray_origin.z()},
-      .dir = {diffuse_dir.x(), diffuse_dir.y(), diffuse_dir.z()},
-      .t = 100,
-      .hit = 0,
-      .u = 0,
-      .v = 0,
-      .visibility = 0,
-  };
-
-  rjm_raytrace(&pathtrace_tree, 1, &ray, RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+  std::vector<float> result_lux_values = trace_batch(pathtrace_tree, next_batch, depth - 1);
 
   const auto cos_factor = [](const Vector3f &a, const Vector3f &b) -> float {
     float dotProduct = a.dot(a);
@@ -141,16 +197,17 @@ float Scene::diffuse_trace(const Vector3f &input_ray_origin, const Vector3f &inp
     return dotProduct / (magnitudeA * magnitudeB);
   };
 
-  float lux = 0.8f;
+  for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
+    if (rays[i_ray].hit != -1) {
+      const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);  // TODO
 
-  if (ray.hit != -1) {
-    const auto [diffuse_ray_origin, diffuse_ray_normal] = get_diffuse_ray(ray);
-    lux = diffuse_trace(diffuse_ray_origin, diffuse_ray_normal, steps_left - 1);
-    lux *= std::abs(cos_factor(diffuse_ray_normal, Vector3f{ray.dir[0], ray.dir[1], ray.dir[2]}));
+      lux_values[i_ray] = result_lux_values[i_ray] *
+                          cos_factor(ray_normal, Vector3f{rays[i_ray].dir[0], rays[i_ray].dir[1], rays[i_ray].dir[2]});
+    }
   }
 
-  return lux;
-};
+  return lux_values;
+}
 
 void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
                         const int32_t start, const int32_t end, Image &target_image) {
@@ -173,27 +230,21 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
   }
 
-  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 2);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
-    const RjmRay &output_ray = rays[i_ray - start];
 
-    if (output_ray.hit != -1) {
-      const auto [output_ray_origin, output_ray_normal] = get_diffuse_ray(output_ray);
-      float l = diffuse_trace(output_ray_origin, output_ray_normal, 2);
+    const float r = std::min(lux_values[i_ray - start] * 255.0f, 255.0f);
 
-      const Color c{
-          .r = (uint8_t)(l * 255.0f),
-          .g = (uint8_t)0,
-          .b = (uint8_t)0,
-          .a = (uint8_t)255,
-      };
+    const Color c{
+        .r = (uint8_t)(r),
+        .g = (uint8_t)0,
+        .b = (uint8_t)0,
+        .a = (uint8_t)255,
+    };
 
-      ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
-    } else {
-      ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), Color{0, 0, 0, 0});
-    }
+    ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
   }
 }
 
