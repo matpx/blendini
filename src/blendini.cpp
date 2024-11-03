@@ -33,16 +33,17 @@ int main(void) {
     const entt::entity sphere_entity = scene->create();
     scene->emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
     scene->emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
-    scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{2, 1, 0});
+    scene->get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{3, 1, 0});
 
     const entt::entity floor_entity = scene->create();
     scene->emplace<Mesh>(floor_entity, GenMeshPlane(10, 10, 10, 10));
     scene->emplace<Eigen::Isometry3f>(floor_entity, Eigen::Isometry3f::Identity());
 
-    // const Model lantern = LoadModel("Lantern.glb");
-    // const entt::entity lantern_entity = scene->create();
-    // scene->emplace<Model>(lantern_entity, lantern);
-    // scene->emplace<Eigen::Isometry3f>(lantern_entity, Eigen::Isometry3f::Identity());
+    const Model monkey = LoadModel("monkey.glb");
+    const entt::entity monkey_entity = scene->create();
+    scene->emplace<Model>(monkey_entity, monkey);
+    scene->emplace<Eigen::Isometry3f>(monkey_entity, Eigen::Isometry3f::Identity());
+    scene->get<Eigen::Isometry3f>(monkey_entity).translate(Eigen::Vector3f{0, 1, 0});
 
     const auto next_power_of_two = [](auto value) -> decltype(value) {
       decltype(value) power = 1;
