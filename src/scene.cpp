@@ -108,23 +108,29 @@ std::pair<Vector3f, Vector3f> Scene::get_diffuse_ray(const RjmRay &output_ray) c
 }
 
 float Scene::diffuse_trace(const RjmRay &input_ray, const int32_t ray_count, const int32_t steps_left) const {
+  if (input_ray.hit == -1) {
+    const auto get_sun = []() -> float { return 0.8f; };
+
+    return get_sun();
+  }
+
   if (steps_left <= 0) {
     return 0.0;
   }
 
-  const auto [origin, normal] = get_diffuse_ray(input_ray);
+  const auto [input_ray_origin, input_ray_normal] = get_diffuse_ray(input_ray);
 
   std::vector<RjmRay> diffuse_rays(ray_count);
 
   Vector3f diffuse_dir = Vector3f::Random();
 
-  if (diffuse_dir.dot(normal) < 0) {
+  if (diffuse_dir.dot(input_ray_normal) < 0) {
     diffuse_dir *= -1;
   }
 
   for (int32_t i_diffuse_ray = 0; i_diffuse_ray < ray_count; i_diffuse_ray++) {
     diffuse_rays[i_diffuse_ray] = {
-        .org = {origin.x(), origin.y(), origin.z()},
+        .org = {input_ray_origin.x(), input_ray_origin.y(), input_ray_origin.z()},
         .dir = {diffuse_dir.x(), diffuse_dir.y(), diffuse_dir.z()},
         .t = 100,
         .hit = 0,
@@ -136,16 +142,11 @@ float Scene::diffuse_trace(const RjmRay &input_ray, const int32_t ray_count, con
 
   rjm_raytrace(&pathtrace_tree, diffuse_rays.size(), diffuse_rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
+  const int32_t next_ray_count = ray_count / 2;
   float lux = 0.0f;
 
   for (const RjmRay &diffuse_ray : diffuse_rays) {
-    if (diffuse_ray.hit == -1) {
-      lux += 100.0f / diffuse_rays.size();
-    } else {
-      for (const RjmRay &previous_ray : diffuse_rays) {
-        lux = diffuse_trace(previous_ray, ray_count / 2, steps_left - 1);
-      }
-    }
+    lux += diffuse_trace(diffuse_ray, next_ray_count / 2, steps_left - 1) / diffuse_rays.size();
   }
 
   return lux;
@@ -179,10 +180,10 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     const RjmRay &output_ray = rays[i_ray - start];
 
     if (output_ray.hit != -1) {
-      float l = diffuse_trace(output_ray, 8, 2);
+      float l = diffuse_trace(output_ray, 16, 2);
 
       const Color c{
-          .r = (uint8_t)l,
+          .r = (uint8_t)(l * 255.0f),
           .g = (uint8_t)0,
           .b = (uint8_t)0,
           .a = (uint8_t)255,
