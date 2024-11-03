@@ -11,7 +11,7 @@
 using namespace Eigen;
 
 [[nodiscard]]
-inline static Vector3f screen_to_world(const Vector2i &screen_pos, const Vector2i &screen_size,
+inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
                                        const Matrix4f &inv_view_proj) {
   const Vector2f ndc{
       (2.0f * screen_pos.x()) / screen_size.x() - 1.0f,
@@ -180,7 +180,7 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
 
       atleast_one_hit = true;
     } else {
-      lux_values[i_ray] = 0.4f;
+      lux_values[i_ray] = 0.8f;
     }
 
     next_batch[i_ray] = next_ray;
@@ -192,21 +192,22 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
 
   std::vector<float> result_lux_values = trace_batch(pathtrace_tree, next_batch, depth - 1);
 
-  const auto cos_factor = [](const Vector3f &a, const Vector3f &b) -> float {
-    float dotProduct = a.dot(a);
+  // const auto cos_factor = [](const Vector3f &a, const Vector3f &b) -> float {
+  //   float dotProduct = a.dot(a);
 
-    float magnitudeA = a.norm();
-    float magnitudeB = b.norm();
+  //   float magnitudeA = a.norm();
+  //   float magnitudeB = b.norm();
 
-    return dotProduct / (magnitudeA * magnitudeB);
-  };
+  //   return dotProduct / (magnitudeA * magnitudeB);
+  // };
 
   for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
     if (rays[i_ray].hit != -1) {
       const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);  // TODO
 
-      lux_values[i_ray] = result_lux_values[i_ray] *
-                          cos_factor(ray_normal, Vector3f{rays[i_ray].dir[0], rays[i_ray].dir[1], rays[i_ray].dir[2]});
+      lux_values[i_ray] =
+          result_lux_values[i_ray] *
+          ray_normal.dot(-Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
     }
   }
 
@@ -220,7 +221,9 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
   std::vector<RjmRay> rays(end - start);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
-    const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+    Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+    screen_coords += Vector2f::Random() * 0.5f;
+
     const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
     rays[i_ray - start] = {
@@ -234,10 +237,10 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
   }
 
-  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 4);
+  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 3);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
-    const Vector2i screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+    const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
     const float r = std::min(lux_values[i_ray - start] * 255.0f, 255.0f);
 
