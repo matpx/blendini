@@ -153,7 +153,7 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
   }
 
   std::vector<float> light_values(ray_batch.size());
-  trace_bounce(pathtrace_tree, ray_batch, 3, light_values);
+  trace_bounce(pathtrace_tree, ray_batch, 4, light_values);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
