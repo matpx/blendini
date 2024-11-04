@@ -1,13 +1,13 @@
 #include "scene.hpp"
 
-#include <Eigen/src/Core/Matrix.h>
-#include <raylib.h>
 #include <rlgl.h>
 
 #include <BS_thread_pool.hpp>
 #include <random>
 
-#include "raymath_eigen.hpp"
+#include "eigen_helper.hpp"
+#include "math_helper.hpp"
+#include "raymath_helper.hpp"
 
 using namespace Eigen;
 
@@ -18,22 +18,20 @@ static float rand_thread_safe(const float min, const float max) {
   return distribution(generator);
 }
 
-[[nodiscard]]
-inline static Vector3f screen_to_world(const Vector2f &screen_pos, const Vector2i &screen_size,
-                                       const Matrix4f &inv_view_proj) {
-  const Vector2f ndc{
-      (2.0f * screen_pos.x()) / screen_size.x() - 1.0f,
-      1.0f - (2.0f * screen_pos.y()) / screen_size.y(),
-  };
+Scene::~Scene() {
+  if (pathtrace_tree.nodes != nullptr) {
+    rjm_freeraytree(&pathtrace_tree);
+  }
 
-  const Vector4f direction = inv_view_proj * Vector4f(ndc.x(), ndc.y(), 1.0f, 1.0f);
-
-  return direction.head<3>().normalized();
+  for (const auto [entity, mesh] : view<const Mesh>().each()) {
+    if (mesh.vaoId > 0) {
+      UnloadMesh(mesh);
+    }
+  }
 }
 
 [[nodiscard]]
-static std::pair<Vector3f, Vector3f> get_ray(const std::vector<Eigen::Vector3f> &pathtrace_vertices,
-                                             const std::vector<int32_t> &pathtrace_indices, const RjmRay &ray) {
+std::pair<Vector3f, Vector3f> Scene::get_ray(const RjmRay &ray) const {
   const std::array<int32_t, 3> triangle_indices = {pathtrace_indices[ray.hit * 3], pathtrace_indices[ray.hit * 3 + 1],
                                                    pathtrace_indices[ray.hit * 3 + 2]};
 
@@ -52,68 +50,31 @@ static std::pair<Vector3f, Vector3f> get_ray(const std::vector<Eigen::Vector3f> 
   return {offset_origin, normal};
 }
 
-Scene::~Scene() {
-  if (pathtrace_tree.nodes != nullptr) {
-    rjm_freeraytree(&pathtrace_tree);
+void Scene::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
+  const uint16_t last_vertex = pathtrace_vertices.size();
+
+  static_assert(sizeof(Vector3f) == sizeof(float) * 3);
+
+  for (const auto &vertex : std::span<Vector3f>(reinterpret_cast<Vector3f *>(mesh.vertices), mesh.vertexCount)) {
+    pathtrace_vertices.push_back(transform * vertex);
   }
 
-  for (const auto [entity, mesh] : view<const Mesh>().each()) {
-    if (mesh.vaoId > 0) {
-      UnloadMesh(mesh);
+  if (mesh.indices != nullptr) {
+    for (const auto &index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
+      pathtrace_indices.push_back(last_vertex + index);
+    }
+  } else {
+    for (int32_t i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
+      pathtrace_indices.push_back(last_vertex + i_index);
     }
   }
 }
 
-void Scene::rebuild() {
-  if (pathtrace_tree.nodes != nullptr) {
-    rjm_freeraytree(&pathtrace_tree);
-  }
-
-  pathtrace_vertices.clear();
-  pathtrace_indices.clear();
-
-  const auto rebuild_mesh = [&](const Isometry3f &transform, const Mesh &mesh) {
-    const uint16_t last_vertex = pathtrace_vertices.size();
-
-    static_assert(sizeof(Vector3f) == sizeof(float) * 3);
-
-    for (const auto &vertex : std::span<Vector3f>(reinterpret_cast<Vector3f *>(mesh.vertices), mesh.vertexCount)) {
-      pathtrace_vertices.push_back(transform * vertex);
-    }
-
-    if (mesh.indices != nullptr) {
-      for (const auto &index : std::span<uint16_t>(mesh.indices, mesh.triangleCount * 3)) {
-        pathtrace_indices.push_back(last_vertex + index);
-      }
-    } else {
-      for (int32_t i_index = 0; i_index < mesh.triangleCount * 3; i_index++) {
-        pathtrace_indices.push_back(last_vertex + i_index);
-      }
-    }
-  };
-
-  for (const auto [entity, transform, mesh] : view<const Isometry3f, const Mesh>().each()) {
-    rebuild_mesh(transform, mesh);
-  }
-
-  for (const auto [entity, transform, model] : view<const Isometry3f, const Model>().each()) {
-    for (const Mesh &mesh : std::span<Mesh>(model.meshes, model.meshCount)) {
-      rebuild_mesh(transform, mesh);
-    }
-  }
-
-  pathtrace_tree.vtxs = reinterpret_cast<float *>(pathtrace_vertices.data());
-  pathtrace_tree.tris = pathtrace_indices.data();
-  pathtrace_tree.triCount = pathtrace_indices.size() / 3;
-
-  rjm_buildraytree(&pathtrace_tree);
-}
-
-std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays,
-                                      const int32_t depth) {
+std::vector<float> Scene::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays,
+                                       const int32_t depth) const {
   rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  std::vector<float> lux_values(rays.size());
+  std::vector<float> light_values(rays.size());
   std::vector<RjmRay> next_batch(rays.size());
 
   bool atleast_one_hit = false;
@@ -122,7 +83,7 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
     RjmRay next_ray = {};
 
     if (rays[i_ray].hit != -1) {
-      const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);
+      const auto [ray_origin, ray_normal] = get_ray(rays[i_ray]);
 
       Vector3f dir =
           Vector3f{rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f)}
@@ -142,46 +103,37 @@ std::vector<float> Scene::trace_batch(const RjmRayTree &pathtrace_tree, std::vec
           .visibility = 0,
       };
 
-      lux_values[i_ray] = 0.0f;
+      light_values[i_ray] = 0.0f;
 
       atleast_one_hit = true;
     } else {
-      lux_values[i_ray] = 0.8f;
+      light_values[i_ray] = 0.8f;
     }
 
     next_batch[i_ray] = next_ray;
   }
 
   if (depth <= 0 || !atleast_one_hit) {
-    return lux_values;
+    return light_values;
   }
 
-  std::vector<float> result_lux_values = trace_batch(pathtrace_tree, next_batch, depth - 1);
-
-  // const auto cos_factor = [](const Vector3f &a, const Vector3f &b) -> float {
-  //   float dotProduct = a.dot(a);
-
-  //   float magnitudeA = a.norm();
-  //   float magnitudeB = b.norm();
-
-  //   return dotProduct / (magnitudeA * magnitudeB);
-  // };
+  std::vector<float> result_light_values = trace_bounce(pathtrace_tree, next_batch, depth - 1);
 
   for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
     if (rays[i_ray].hit != -1) {
-      const auto [ray_origin, ray_normal] = get_ray(pathtrace_vertices, pathtrace_indices, rays[i_ray]);  // TODO
+      const auto [ray_origin, ray_normal] = get_ray(rays[i_ray]);  // TODO
 
-      lux_values[i_ray] =
-          result_lux_values[i_ray] *
+      light_values[i_ray] =
+          result_light_values[i_ray] *
           ray_normal.dot(Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
     }
   }
 
-  return lux_values;
+  return light_values;
 }
 
-void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
-                        const int32_t start, const int32_t end, Image &target_image, const bool reset) {
+void Scene::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
+                         const int32_t start, const int32_t end, Image &target_image, const int32_t steps) const {
   assert(start < end);
 
   std::vector<RjmRay> rays(end - start);
@@ -206,33 +158,58 @@ void Scene::first_trace(const Vector2i &pathtrace_area, const Matrix4f &inv_view
     };
   }
 
-  std::vector<float> lux_values = trace_batch(pathtrace_tree, rays, 3);
+  std::vector<float> light_values = trace_bounce(pathtrace_tree, rays, 3);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
-    const float r = lux_values[i_ray - start] * 255.0f;  // TODO
+    const float v = std::clamp(light_values[i_ray - start], 0.0f, 1.0f) * 255.0f;
 
     const Color new_color{
-        .r = (uint8_t)r,
-        .g = (uint8_t)r,
-        .b = (uint8_t)r,
+        .r = (uint8_t)v,
+        .g = (uint8_t)v,
+        .b = (uint8_t)v,
         .a = (uint8_t)255,
     };
 
-    const float interpolation_factor = reset ? 1.0 : 0.025f;
+    const float interpolation_factor = std::max(1.0f / steps, 0.01f);
 
     Color interpolate_color = GetImageColor(target_image, screen_coords.x(), screen_coords.y());
-    interpolate_color.r += (new_color.r - interpolate_color.r) * interpolation_factor;
-    interpolate_color.g += (new_color.g - interpolate_color.g) * interpolation_factor;
-    interpolate_color.b += (new_color.b - interpolate_color.b) * interpolation_factor;
+    interpolate_color.r = new_color.r * interpolation_factor + interpolate_color.r * (1 - interpolation_factor);
+    interpolate_color.g = new_color.g * interpolation_factor + interpolate_color.g * (1 - interpolation_factor);
+    interpolate_color.b = new_color.b * interpolation_factor + interpolate_color.b * (1 - interpolation_factor);
 
     ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), interpolate_color);
   }
 }
 
+void Scene::rebuild_tree() {
+  if (pathtrace_tree.nodes != nullptr) {
+    rjm_freeraytree(&pathtrace_tree);
+  }
+
+  pathtrace_vertices.clear();
+  pathtrace_indices.clear();
+
+  for (const auto [entity, transform, mesh] : view<const Isometry3f, const Mesh>().each()) {
+    rebuild_mesh(transform, mesh);
+  }
+
+  for (const auto [entity, transform, model] : view<const Isometry3f, const Model>().each()) {
+    for (const Mesh &mesh : std::span<Mesh>(model.meshes, model.meshCount)) {
+      rebuild_mesh(transform, mesh);
+    }
+  }
+
+  pathtrace_tree.vtxs = reinterpret_cast<float *>(pathtrace_vertices.data());
+  pathtrace_tree.tris = pathtrace_indices.data();
+  pathtrace_tree.triCount = pathtrace_indices.size() / 3;
+
+  rjm_buildraytree(&pathtrace_tree);
+}
+
 void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Image &target_image,
-                        const Vector2i &pathtrace_area, const bool reset) {
+                        const Vector2i &pathtrace_area, const int32_t steps) const {
   assert(IsImageReady(target_image));
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
@@ -244,7 +221,7 @@ void Scene::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, Im
   const Vector3f origin = tr(camera.position);
 
   const auto trace_task = [&](const int32_t start, const int32_t end) {
-    first_trace(pathtrace_area, inv_view_proj, origin, start, end, target_image, reset);
+    trace_screen(pathtrace_area, inv_view_proj, origin, start, end, target_image, steps);
   };
 
   const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();

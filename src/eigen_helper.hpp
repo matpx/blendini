@@ -90,16 +90,6 @@ Eigen::Matrix<Scalar, 4, 4> ortho(Scalar const& left, Scalar const& right, Scala
   return mat;
 }
 
-inline ::Matrix tr(const Matrix4f& from) {
-  const auto data = from.data();
 
-  return ::Matrix{
-      data[0], data[4], data[8],  data[12], data[1], data[5], data[9],  data[13],
-      data[2], data[6], data[10], data[14], data[3], data[7], data[11], data[15],
-  };
-}
-
-inline ::Vector3 tr(const Vector3f& from) { return ::Vector3{from.x(), from.y(), from.z()}; }
-inline Vector3f tr(const ::Vector3& from) { return Vector3f{from.x, from.y, from.z}; }
 
 }  // namespace Eigen
