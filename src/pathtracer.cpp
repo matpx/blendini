@@ -61,16 +61,16 @@ void Pathtracer::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
 }
 
 void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch, const int32_t depth,
-                              std::vector<float> &light_values) const {
+                              std::vector<Vector3f> &light_values) const {
   const int32_t hit_count =
       rjm_raytrace(&pathtrace_tree, ray_batch.size(), ray_batch.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
   if (depth <= 1 || hit_count == 0) {
     for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
       if (ray_batch[i_ray].hit != -1) {
-        light_values[i_ray] = 0.0f;
+        light_values[i_ray] = Vector3f{0.0f, 0.0f, 0.0f};
       } else {
-        light_values[i_ray] = 1.0f;
+        light_values[i_ray] = Vector3f{0.8f, 0.8f, 0.8f};
       }
     }
 
@@ -152,19 +152,21 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
     };
   }
 
-  std::vector<float> light_values(ray_batch.size());
+  std::vector<Vector3f> light_values(ray_batch.size());
   trace_bounce(pathtrace_tree, ray_batch, 4, light_values);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
-    const float v = std::clamp(light_values[i_ray - start], 0.0f, 1.0f);
-
-    const Vector4f new_color{v, v, v, 255};
+    const Vector3f new_color = light_values[i_ray - start].cwiseMax(0.0f).cwiseMin(1.0f);
 
     const float interpolation_factor = 1.0f / steps;
 
-    pathtrace_buffer[i_ray] = new_color * interpolation_factor + pathtrace_buffer[i_ray] * (1 - interpolation_factor);
+    for (int32_t i_channel = 0; i_channel < pathtrace_buffer.dimension(2); i_channel++) {
+      pathtrace_buffer(screen_coords.x(), screen_coords.y(), i_channel) =
+          new_color[i_channel] * interpolation_factor +
+          pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), i_channel) * (1 - interpolation_factor);
+    }
   }
 }
 
@@ -211,7 +213,7 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
   const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
   const Vector3f origin = tr(camera.position);
 
-  pathtrace_buffer.resize(pathtrace_area.x() * pathtrace_area.y());
+  pathtrace_buffer.resize(pathtrace_area.x(), pathtrace_area.y(), 3);
 
   const auto trace_task = [&](const int32_t start, const int32_t end) {
     trace_screen(pathtrace_area, inv_view_proj, origin, start, end, steps);
@@ -220,9 +222,9 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
       const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
       const Color c{
-          .r = (uint8_t)(pathtrace_buffer[i_ray].x() * 255.0f),
-          .g = (uint8_t)(pathtrace_buffer[i_ray].y() * 255.0f),
-          .b = (uint8_t)(pathtrace_buffer[i_ray].z() * 255.0f),
+          .r = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 0) * 255.0f),
+          .g = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 1) * 255.0f),
+          .b = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 2) * 255.0f),
           .a = 255,
       };
 

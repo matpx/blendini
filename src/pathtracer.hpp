@@ -3,6 +3,7 @@
 #include <raylib.h>
 
 #include <Eigen/Dense>
+#include <unsupported/Eigen/CXX11/Tensor>
 
 #include "rjm_raytrace_fork.h"
 
@@ -17,7 +18,7 @@ class Pathtracer {
   RjmRayTree pathtrace_tree = {};
   std::vector<Eigen::Vector3f> pathtrace_vertices;
   std::vector<int32_t> pathtrace_indices;
-  std::vector<Eigen::Vector4f> pathtrace_buffer;
+  Eigen::Tensor<float, 3> pathtrace_buffer;
 
  private:
   [[nodiscard]]
@@ -26,7 +27,7 @@ class Pathtracer {
   void rebuild_mesh(const Eigen::Isometry3f &transform, const Mesh &mesh);
 
   void trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch, const int32_t depth,
-                    std::vector<float> &light_values) const;
+                    std::vector<Eigen::Vector3f> &light_values) const;
 
   void trace_screen(const Eigen::Vector2i &pathtrace_area, const Eigen::Matrix4f &inv_view_proj,
                     const Eigen::Vector3f &origin, const int32_t start, const int32_t end, const int32_t steps);
