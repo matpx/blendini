@@ -232,6 +232,6 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
 
   const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
 
-  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task);
+  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 512);
   thread_pool.wait();
 }
