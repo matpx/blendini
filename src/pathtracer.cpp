@@ -35,7 +35,7 @@ std::pair<Vector3f, Vector3f> Pathtracer::get_ray(const RjmRay &ray) const {
   const Vector3f origin =
       (1.0f - ray.u - ray.v) * triangle_vertices[0] + ray.u * triangle_vertices[1] + ray.v * triangle_vertices[2];
 
-  const Vector3f offset_origin = origin + normal * 0.01f;
+  const Vector3f offset_origin = origin + normal * 0.00001f;
 
   return {offset_origin, normal};
 }
