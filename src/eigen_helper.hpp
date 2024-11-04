@@ -3,7 +3,6 @@
 #include <raymath.h>
 
 #include <Eigen/Dense>
-#include <Eigen/Geometry>
 
 namespace Eigen {
 

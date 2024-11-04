@@ -5,8 +5,6 @@
 
 #include <Eigen/Dense>
 
-#include "math_helper.hpp"
-
 class GfxContext {
  public:
   GfxContext(const GfxContext &) = delete;

@@ -1,4 +1,5 @@
 #include "gfx_context.hpp"
+#include "math_helper.hpp"
 
   GfxContext::GfxContext() {
     const int screenWidth = 1920;

@@ -23,7 +23,7 @@ class Scene final : public entt::registry {
   void rebuild_mesh(const Eigen::Isometry3f &transform, const Mesh &mesh);
 
   [[nodiscard]]
-  std::vector<float> trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays,
+  std::vector<float> trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
                                   const int32_t depth) const;
 
   void trace_screen(const Eigen::Vector2i &pathtrace_area, const Eigen::Matrix4f &inv_view_proj,

@@ -2,7 +2,13 @@
 /compile_commands.json
 
 /src/*.o
+/src/*.d
+
+/extern/imgui/*.o
+/extern/imgui/*.d
+
 /extern/rlImGui/*.o
+/extern/rlImGui/*.d
 
 /blendini
 /blendini.exe

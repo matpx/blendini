@@ -70,20 +70,20 @@ void Scene::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
   }
 }
 
-std::vector<float> Scene::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &rays,
+std::vector<float> Scene::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
                                        const int32_t depth) const {
-  rjm_raytrace(&pathtrace_tree, rays.size(), rays.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
+  rjm_raytrace(&pathtrace_tree, ray_batch.size(), ray_batch.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  std::vector<float> light_values(rays.size());
-  std::vector<RjmRay> next_batch(rays.size());
+  std::vector<float> light_values(ray_batch.size());
+  std::vector<RjmRay> next_batch(ray_batch.size());
 
   bool atleast_one_hit = false;
 
-  for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
+  for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
     RjmRay next_ray = {};
 
-    if (rays[i_ray].hit != -1) {
-      const auto [ray_origin, ray_normal] = get_ray(rays[i_ray]);
+    if (ray_batch[i_ray].hit != -1) {
+      const auto [ray_origin, ray_normal] = get_ray(ray_batch[i_ray]);
 
       Vector3f dir =
           Vector3f{rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f)}
@@ -119,9 +119,9 @@ std::vector<float> Scene::trace_bounce(const RjmRayTree &pathtrace_tree, std::ve
 
   std::vector<float> result_light_values = trace_bounce(pathtrace_tree, next_batch, depth - 1);
 
-  for (size_t i_ray = 0; i_ray < rays.size(); i_ray++) {
-    if (rays[i_ray].hit != -1) {
-      const auto [ray_origin, ray_normal] = get_ray(rays[i_ray]);  // TODO
+  for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
+    if (ray_batch[i_ray].hit != -1) {
+      const auto [ray_origin, ray_normal] = get_ray(ray_batch[i_ray]);  // TODO
 
       light_values[i_ray] =
           result_light_values[i_ray] *
@@ -136,7 +136,7 @@ void Scene::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_vie
                          const int32_t start, const int32_t end, Image &target_image, const int32_t steps) const {
   assert(start < end);
 
-  std::vector<RjmRay> rays(end - start);
+  std::vector<RjmRay> ray_batch(end - start);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     constexpr float jiggle_width = 0.5f;
@@ -147,7 +147,7 @@ void Scene::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_vie
 
     const Vector3f ray = screen_to_world(screen_coords, pathtrace_area, inv_view_proj);
 
-    rays[i_ray - start] = {
+    ray_batch[i_ray - start] = {
         .org = {origin.x(), origin.y(), origin.z()},
         .dir = {ray.x(), ray.y(), ray.z()},
         .t = 100,
@@ -158,7 +158,7 @@ void Scene::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_vie
     };
   }
 
-  std::vector<float> light_values = trace_bounce(pathtrace_tree, rays, 3);
+  std::vector<float> light_values = trace_bounce(pathtrace_tree, ray_batch, 3);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};

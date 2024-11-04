@@ -1,4 +1,3 @@
-
 RAYLIB_PATH += extern/raylib/src/
 
 OBJS += $(patsubst %.cpp,%.o,$(wildcard extern/imgui/*.cpp)) $(patsubst %.cpp,%.o,$(wildcard extern/rlImGui/*.cpp))
@@ -22,11 +21,14 @@ else
 	RAYLIB_MODE ?= RELEASE
 endif
 
-blendini: $(OBJS) $(RAYLIB_PATH)libraylib.a $(IMGUI_SRC)
+blendini: $(OBJS) $(RAYLIB_PATH)libraylib.a
 	$(CXX) -o blendini $^ $(FLAGS)
 
-%.o: %.cpp $(HEADER)
+%.o: %.cpp
 	$(CXX) -o $@ -c $< $(FLAGS)
+	$(CXX) -MM -MT $@ -MF $(@:.o=.d) $< $(FLAGS)
+
+-include $(OBJS:.o=.d)
 
 $(RAYLIB_PATH)libraylib.a:
 	$(MAKE) -C $(RAYLIB_PATH) RAYLIB_BUILD_MODE=$(RAYLIB_MODE)
@@ -35,6 +37,5 @@ $(RAYLIB_PATH)libraylib.a:
 
 clean:
 	$(RM) blendini blendini.exe
-	$(RM) src/*.o extern/imgui/*.o extern/rlImGui/*.o
+	$(RM) src/*.o src/*.d extern/imgui/*.o extern/imgui/*.d extern/rlImGui/*.o extern/rlImGui/*.d
 	$(MAKE) -C $(RAYLIB_PATH) clean
-
