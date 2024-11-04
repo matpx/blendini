@@ -46,9 +46,9 @@ void App::draw_viewport() {
 }
 
 void App::draw_pathtrace() {
-  scene.rebuild_tree();
-  scene.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_image, gfx_context.pathtrace_area,
-                     gfx_context.pathtrace_steps);
+  pathtracer.rebuild_tree(scene);
+  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps,
+                         gfx_context.pathtrace_image);
 
   gfx_context.pathtrace_steps++;
 

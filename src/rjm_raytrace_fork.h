@@ -66,6 +66,7 @@ typedef struct RjmRay
 	int hit;				// output: triangle we hit (-1 if none)
 	float u, v;				// output: barycentric coordinates of intersection
 	float visibility;		// output: ratio of how much the ray was blocked by geometry
+	float user_normal[3];	// user: normal
 } RjmRay;
 
 // Initializes a tree from its scene description.
@@ -81,13 +82,14 @@ void rjm_freeraytree(RjmRayTree *tree);
 // tree:            Your scene (call rjm_buildraytree on it first)
 // nrays/rays:      Batch of rays to trace. No limit to how many.
 // filter/userdata: Custom callback for filtering triangles (can be NULL)
+// result:			Count of hits
 //
 // cutoff:
 //    Set to RJM_RAYTRACE_FIRSTHIT to find the earliest intersection 
 //    along each ray (i.e. the one with the lowest 't' value).
 //    Otherwise, this specifies a visibility cutoff (0-1), and the trace will
 //    stop once the visibility falls below or equal to this value.
-void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata);
+int rjm_raytrace(const RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata);
 
 
 //--- Implementation follows ----------------------------------------------
@@ -236,7 +238,7 @@ void rjm_freeraytree(RjmRayTree *tree)
 	tree->firstLeaf = -1;
 }
 
-void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata)
+int rjm_raytrace(const RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRayFilterFn *filter, void *userdata)
 {
 	// Allocate local SSE structures.
 	RJM_RT_ALIGN float rx[RJM_PACKET_SIZE], ry[RJM_PACKET_SIZE], rz[RJM_PACKET_SIZE];
@@ -249,6 +251,7 @@ void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRa
 	RJM_RT_ALIGN float out_u[RJM_PACKET_SIZE], out_v[RJM_PACKET_SIZE], out_t[RJM_PACKET_SIZE];
 
 	int stack[64], *top;
+	int hit_count = 0;
 
 	// Process it in packets, in case they pass in a lot of rays at once.
 	for (int base=0;base<nrays;)
@@ -390,6 +393,8 @@ void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRa
 							{
 								RjmRay *ray = rays + rayidx[n];
 								if (out_t[n] < ray->t) {
+									hit_count++;
+
 									float opacity = 1.0f;
 									if (filter)
 										opacity = filter(triIdx, rayidx[n], out_t[n], out_u[n], out_v[n], userdata);
@@ -512,6 +517,8 @@ void rjm_raytrace(RjmRayTree *tree, int nrays, RjmRay *rays, float cutoff, RjmRa
 
 		base = next;
 	}
+
+	return hit_count;
 }
 
 #endif // RJM_RAYTRACE_IMPLEMENTATION

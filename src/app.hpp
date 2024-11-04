@@ -3,6 +3,7 @@
 #include <BS_thread_pool.hpp>
 
 #include "gfx_context.hpp"
+#include "pathtracer.hpp"
 #include "scene.hpp"
 
 class App {
@@ -12,6 +13,7 @@ class App {
   GfxContext gfx_context;
 
   Scene scene;
+  Pathtracer pathtracer;
 
   Model monkey;
 

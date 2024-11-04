@@ -3,12 +3,15 @@
 
 /src/*.o
 /src/*.d
+/src/*.o.tmp
 
 /extern/imgui/*.o
 /extern/imgui/*.d
+/extern/imgui/*.o.tmp
 
 /extern/rlImGui/*.o
 /extern/rlImGui/*.d
+/extern/rlImGui/*.o.tmp
 
 /blendini
 /blendini.exe

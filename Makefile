@@ -3,8 +3,6 @@ RAYLIB_PATH += extern/raylib/src/
 OBJS += $(patsubst %.cpp,%.o,$(wildcard extern/imgui/*.cpp)) $(patsubst %.cpp,%.o,$(wildcard extern/rlImGui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard src/*.cpp))
 
-HEADER += $(wildcard extern/rjm/*.h) $(wildcard src/*.hpp)
-
 FLAGS += -isystem extern/ -isystem extern/raylib/src -isystem extern/imgui -isystem extern/eigen -isystem extern/entt/src -isystem extern/thread-pool/include
 FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
 FLAGS += -march=native
