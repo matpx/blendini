@@ -4,6 +4,8 @@
 
 #include <entt/entt.hpp>
 
+#include "world.hpp"
+
 class Scene final : public entt::registry {
  public:
   Camera3D camera = {
@@ -13,6 +15,8 @@ class Scene final : public entt::registry {
       .fovy = 45.0f,
       .projection = CAMERA_PERSPECTIVE,
   };
+
+  World world;
 
  public:
   Scene() = default;

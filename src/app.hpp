@@ -8,6 +8,16 @@
 
 class App {
  public:
+  enum class Mode {
+    VIEWPORT,
+    PATHTRACE,
+  };
+
+  private:
+
+  Mode current_mode = Mode::VIEWPORT;
+
+ public:
   BS::thread_pool thread_pool;
 
   GfxContext gfx_context;

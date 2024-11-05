@@ -60,20 +60,20 @@ void Pathtracer::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
   }
 }
 
-std::vector<Vector3f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
+std::vector<Vector4f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
                                                const int32_t depth) const {
   const int32_t hit_count =
       rjm_raytrace(&pathtrace_tree, ray_batch.size(), ray_batch.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  std::vector<Vector3f> light_values(ray_batch.size());
+  std::vector<Vector4f> light_values(ray_batch.size());
 
   for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
     if (ray_batch[i_ray].hit != -1) {
-      light_values[i_ray] = Vector3f{0.0f, 0.0f, 0.0f};
+      light_values[i_ray] = Vector4f{0.0f, 0.0f, 0.0f, 0.0f};
     } else {
       const float sky_blend_factor = ray_batch[i_ray].dir[1] * 0.5f + 0.5f;
       light_values[i_ray] =
-          (1.0 - sky_blend_factor) * Vector3f{1.0, 1.0, 1.0} + sky_blend_factor * Vector3f{0.5, 0.7, 1.0};
+          (1.0 - sky_blend_factor) * Vector4f{1.0f, 1.0f, 1.0f, 1.0f} + sky_blend_factor * world.sky_color;
     }
   }
 
@@ -116,7 +116,7 @@ std::vector<Vector3f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree,
     next_batch[i_ray] = next_ray;
   }
 
-  std::vector<Vector3f> result_light_values = trace_bounce(pathtrace_tree, next_batch, depth - 1);
+  std::vector<Vector4f> result_light_values = trace_bounce(pathtrace_tree, next_batch, depth - 1);
 
   for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
     if (ray_batch[i_ray].hit != -1) {
@@ -132,7 +132,7 @@ std::vector<Vector3f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree,
 }
 
 void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
-                              const int32_t start, const int32_t end, const int32_t steps) {
+                              const int32_t start, const int32_t end, const int32_t current_step) {
   assert(start < end);
 
   std::vector<RjmRay> ray_batch(end - start);
@@ -158,14 +158,14 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
     };
   }
 
-  const std::vector<Vector3f> light_values = trace_bounce(pathtrace_tree, ray_batch, 4);
+  const std::vector<Vector4f> light_values = trace_bounce(pathtrace_tree, ray_batch, 4);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
-    const Vector3f new_color = light_values[i_ray - start].cwiseMax(0.0f).cwiseMin(1.0f);
+    const Vector4f new_color = light_values[i_ray - start].cwiseMax(0.0f).cwiseMin(1.0f);
 
-    const float interpolation_factor = 1.0f / steps;
+    const float interpolation_factor = 1.0f / current_step;
 
     for (int32_t i_channel = 0; i_channel < pathtrace_buffer.dimension(2); i_channel++) {
       pathtrace_buffer(screen_coords.x(), screen_coords.y(), i_channel) =
@@ -181,7 +181,9 @@ Pathtracer::~Pathtracer() {
   }
 }
 
-void Pathtracer::rebuild_tree(const Scene &scene) {
+void Pathtracer::rebuild_tree(const Scene &scene, const World &new_world) {
+  world = new_world;
+
   if (pathtrace_tree.nodes != nullptr) {
     rjm_freeraytree(&pathtrace_tree);
   }
@@ -207,7 +209,7 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
 }
 
 void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, const Vector2i &pathtrace_area,
-                             const int32_t steps, Image &target_image) {
+                             const int32_t current_step, Image &target_image) {
   assert(IsImageReady(target_image));
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
@@ -221,7 +223,7 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
   pathtrace_buffer.resize(pathtrace_area.x(), pathtrace_area.y(), 3);
 
   const auto trace_task = [&](const int32_t start, const int32_t end) {
-    trace_screen(pathtrace_area, inv_view_proj, origin, start, end, steps);
+    trace_screen(pathtrace_area, inv_view_proj, origin, start, end, current_step);
 
     for (int i_ray = start; i_ray < end; i_ray++) {
       const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};

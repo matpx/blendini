@@ -1,5 +1,9 @@
 #include "app.hpp"
 
+#include <raylib.h>
+
+#include "raymath_helper.hpp"
+
 App::App() {
   const entt::entity sphere_entity = scene.create();
   scene.emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
@@ -25,28 +29,46 @@ void App::process_inputs() {
 
     gfx_context.pathtrace_steps = 1;
   }
+
+  if (IsKeyPressed(KEY_F1)) {
+    current_mode = current_mode == Mode::VIEWPORT ? Mode::PATHTRACE : Mode::VIEWPORT;
+  }
 }
 
 void App::draw_viewport() {
+  if (current_mode != Mode::VIEWPORT) {
+    return;
+  }
+
+  SetShaderValue(gfx_context.default_shader, gfx_context.default_shader.locs[SHADER_LOC_VECTOR_VIEW],
+                 &scene.camera.position, SHADER_UNIFORM_VEC3);
+
+  SetShaderValue(gfx_context.default_shader, gfx_context.default_shader.locs[SHADER_LOC_COLOR_AMBIENT],
+                 scene.world.sky_color.data(), SHADER_UNIFORM_VEC4);
+
   BeginMode3D(scene.camera);
 
   DrawGrid(10, 1.0f);
 
-  // for (const auto [entity, transform, mesh] : scene.view<const Eigen::Isometry3f, const Mesh>().each()) {
-  //   DrawMesh(mesh, default_material, Eigen::tr(transform.matrix()));
-  // }
+  for (const auto [entity, transform, mesh] : scene.view<const Eigen::Isometry3f, const Mesh>().each()) {
+    DrawMesh(mesh, gfx_context.default_material, tr(transform.matrix()));
+  }
 
-  // for (const auto [entity, transform, model] : scene.view<const Eigen::Isometry3f, const Model>().each()) {
-  //   DrawModel(model,
-  //             Vector3{transform.translation().x(), transform.translation().y(), transform.translation().z()},
-  //             1.0f, WHITE);
-  // }
+  for (const auto [entity, transform, model] : scene.view<const Eigen::Isometry3f, const Model>().each()) {
+    model.materials[0].shader = gfx_context.default_shader;
+    DrawModel(model, Vector3{transform.translation().x(), transform.translation().y(), transform.translation().z()},
+              1.0f, WHITE);
+  }
 
   EndMode3D();
 }
 
 void App::draw_pathtrace() {
-  pathtracer.rebuild_tree(scene);
+  if (current_mode != Mode::PATHTRACE) {
+    return;
+  }
+
+  pathtracer.rebuild_tree(scene, scene.world);
   pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps,
                          gfx_context.pathtrace_image);
 
