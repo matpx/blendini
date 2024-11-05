@@ -21,8 +21,8 @@ GfxContext::GfxContext() {
   pathtrace_texture = LoadTextureFromImage(pathtrace_image);
 
   default_shader =
-      LoadShader(TextFormat("extern/raylib/examples/shaders/resources/shaders/glsl%i/lighting.vs", GLSL_VERSION),
-                 TextFormat("extern/raylib/examples/shaders/resources/shaders/glsl%i/lighting.fs", GLSL_VERSION));
+      LoadShader(TextFormat("src/extern/raylib/examples/shaders/resources/shaders/glsl%i/lighting.vs", GLSL_VERSION),
+                 TextFormat("src/extern/raylib/examples/shaders/resources/shaders/glsl%i/lighting.fs", GLSL_VERSION));
 
   assert(IsShaderReady(default_shader));  // TODO
 
