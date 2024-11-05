@@ -1,10 +1,11 @@
-RAYLIB_PATH += src/extern/raylib/src/
+SOURCE += src/
+RAYLIB_PATH += $(SOURCE)extern/raylib/src/
 
-OBJS += $(patsubst %.cpp,%.o,$(wildcard src/extern/imgui/*.cpp))
-OBJS += $(patsubst %.cpp,%.o,$(wildcard src/extern/rlImGui/*.cpp))
-OBJS += $(patsubst %.cpp,%.o,$(wildcard src/*.cpp))
+OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/imgui/*.cpp))
+OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/rlImGui/*.cpp))
+OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)*.cpp))
 
-FLAGS += -isystem src/extern/ -isystem src/extern/raylib/src -isystem src/extern/imgui -isystem src/extern/eigen -isystem src/extern/entt/src -isystem src/extern/thread-pool/include
+FLAGS += -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src -isystem $(SOURCE)extern/imgui -isystem $(SOURCE)extern/eigen -isystem $(SOURCE)extern/entt/src -isystem $(SOURCE)extern/thread-pool/include
 FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
 FLAGS += -march=native
 
@@ -36,7 +37,7 @@ $(RAYLIB_PATH)libraylib.a:
 
 clean:
 	$(RM) blendini blendini.exe
-	$(RM) src/*.o src/*.d src/*.o.tmp
-	$(RM) src/extern/imgui/*.o src/extern/imgui/*.d src/extern/imgui/*.o.tmp
-	$(RM) src/extern/rlImGui/*.o src/extern/rlImGui/*.d src/extern/rlImGui/*.o.tmp
+	$(RM) $(SOURCE)*.o $(SOURCE)*.d $(SOURCE)*.o.tmp
+	$(RM) $(SOURCE)extern/imgui/*.o $(SOURCE)extern/imgui/*.d $(SOURCE)extern/imgui/*.o.tmp
+	$(RM) $(SOURCE)extern/rlImGui/*.o $(SOURCE)extern/rlImGui/*.d $(SOURCE)extern/rlImGui/*.o.tmp
 	$(MAKE) -C $(RAYLIB_PATH) clean
