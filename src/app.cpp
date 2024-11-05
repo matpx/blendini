@@ -81,12 +81,12 @@ void App::draw_pathtrace() {
 
   gfx_context.pathtrace_steps++;
 
-  {
-    std::lock_guard image_swap_pair_lock(gfx_context.image_swap_pair->m);
-    Color *pathtrace_image_colors = LoadImageColors(gfx_context.image_swap_pair->read_image);
-    UpdateTexture(gfx_context.pathtrace_texture, pathtrace_image_colors);
-    UnloadImageColors(pathtrace_image_colors);
-  }
+  gfx_context.image_swap_pair->swap_mutex.lock();
+  Color *pathtrace_image_colors = LoadImageColors(gfx_context.image_swap_pair->read_image);
+  gfx_context.image_swap_pair->swap_mutex.unlock();
+
+  UpdateTexture(gfx_context.pathtrace_texture, pathtrace_image_colors);
+  UnloadImageColors(pathtrace_image_colors);
 
   DrawTexture(gfx_context.pathtrace_texture, 0, 0, {255, 255, 255, 255});
 }

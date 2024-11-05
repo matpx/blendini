@@ -215,6 +215,7 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
 void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, const Vector2i &pathtrace_area,
                              const int32_t current_step) {
   assert(pathtrace_tree.nodes != nullptr);
+  assert(IsImageReady(image_swap_pair->write_image));
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
   const Matrix4f projectionMatrix =
@@ -248,10 +249,5 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
   thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 512);
   thread_pool.wait();
 
-  {
-    std::lock_guard image_swap_pair_lock(image_swap_pair->m);
-    assert(IsImageReady(image_swap_pair->write_image));
-
-    std::swap(image_swap_pair->read_image, image_swap_pair->write_image);
-  }
+  image_swap_pair->swap();
 }
