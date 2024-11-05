@@ -23,7 +23,7 @@ class GfxContext {
   Shader default_shader;
   Material default_material;
 
-  int32_t pathtrace_steps = 1;
+  int32_t pathtrace_steps = 0;
 
   GfxContext();
   ~GfxContext();

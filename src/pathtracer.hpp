@@ -6,7 +6,7 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include "rjm_raytrace_fork.h"
-#include "world.hpp"
+#include "sky.hpp"
 
 namespace BS {
 class thread_pool;
@@ -21,7 +21,7 @@ class Pathtracer {
   std::vector<int32_t> pathtrace_indices;
   Eigen::Tensor<float, 3> pathtrace_buffer;
 
-  World world = {};
+  Sky sky = {};
 
  private:
   [[nodiscard]]
@@ -42,7 +42,12 @@ class Pathtracer {
   Pathtracer(Pathtracer &&) = delete;
   ~Pathtracer();
 
-  void rebuild_tree(const Scene &scene, const World& new_world);
+  void rebuild_tree(const Scene &scene);
   void trace_image(BS::thread_pool &pool, const Camera3D &camera, const Eigen::Vector2i &pathtrace_area,
                    const int32_t current_step, Image &target_image);
+
+  [[nodiscard]]
+  constexpr bool is_ready() const {
+    return pathtrace_tree.nodes != nullptr;
+  }
 };

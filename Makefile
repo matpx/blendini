@@ -17,7 +17,11 @@ ifdef DEBUG
 
 	RAYLIB_MODE ?= DEBUG
 else
-	FLAGS += -O3 -DNDEBUG
+	FLAGS += -O3
+
+	ifdef NOSAFETY
+		FLAGS += -DNDEBUG
+	endif
 
 	RAYLIB_MODE ?= RELEASE
 endif

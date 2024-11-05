@@ -24,10 +24,11 @@ App::App() {
 App::~App() { UnloadModel(monkey); }
 
 void App::process_inputs() {
-  if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || GetMouseWheelMove() != 0.0f) {
-    UpdateCamera(&scene.camera, CAMERA_FREE);
+  user_input_occured = IsMouseButtonDown(MOUSE_RIGHT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) ||
+                       IsKeyDown(KEY_F1) || GetMouseWheelMove() != 0.0f;
 
-    gfx_context.pathtrace_steps = 1;
+  if (user_input_occured) {
+    UpdateCamera(&scene.camera, CAMERA_FREE);
   }
 
   if (IsKeyPressed(KEY_F1)) {
@@ -44,7 +45,7 @@ void App::draw_viewport() {
                  &scene.camera.position, SHADER_UNIFORM_VEC3);
 
   SetShaderValue(gfx_context.default_shader, gfx_context.default_shader.locs[SHADER_LOC_COLOR_AMBIENT],
-                 scene.world.sky_color.data(), SHADER_UNIFORM_VEC4);
+                 scene.sky.top_color.data(), SHADER_UNIFORM_VEC4);
 
   BeginMode3D(scene.camera);
 
@@ -68,7 +69,11 @@ void App::draw_pathtrace() {
     return;
   }
 
-  pathtracer.rebuild_tree(scene, scene.world);
+  if (user_input_occured || !pathtracer.is_ready()) {
+    gfx_context.pathtrace_steps = 0;
+    pathtracer.rebuild_tree(scene);
+  }
+
   pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps,
                          gfx_context.pathtrace_image);
 

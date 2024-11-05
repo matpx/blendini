@@ -72,8 +72,7 @@ std::vector<Vector4f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree,
       light_values[i_ray] = Vector4f{0.0f, 0.0f, 0.0f, 0.0f};
     } else {
       const float sky_blend_factor = ray_batch[i_ray].dir[1] * 0.5f + 0.5f;
-      light_values[i_ray] =
-          (1.0 - sky_blend_factor) * Vector4f{1.0f, 1.0f, 1.0f, 1.0f} + sky_blend_factor * world.sky_color;
+      light_values[i_ray] = (1.0 - sky_blend_factor) * sky.bottom_color + sky_blend_factor * sky.top_color;
     }
   }
 
@@ -160,12 +159,12 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
 
   const std::vector<Vector4f> light_values = trace_bounce(pathtrace_tree, ray_batch, 4);
 
+  const float interpolation_factor = 1.0f / (current_step + 1);
+
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
 
     const Vector4f new_color = light_values[i_ray - start].cwiseMax(0.0f).cwiseMin(1.0f);
-
-    const float interpolation_factor = 1.0f / current_step;
 
     for (int32_t i_channel = 0; i_channel < pathtrace_buffer.dimension(2); i_channel++) {
       pathtrace_buffer(screen_coords.x(), screen_coords.y(), i_channel) =
@@ -181,10 +180,10 @@ Pathtracer::~Pathtracer() {
   }
 }
 
-void Pathtracer::rebuild_tree(const Scene &scene, const World &new_world) {
-  world = new_world;
+void Pathtracer::rebuild_tree(const Scene &scene) {
+  sky = scene.sky;
 
-  if (pathtrace_tree.nodes != nullptr) {
+  if (is_ready()) {
     rjm_freeraytree(&pathtrace_tree);
   }
 
@@ -211,6 +210,7 @@ void Pathtracer::rebuild_tree(const Scene &scene, const World &new_world) {
 void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, const Vector2i &pathtrace_area,
                              const int32_t current_step, Image &target_image) {
   assert(IsImageReady(target_image));
+  assert(pathtrace_tree.nodes != nullptr);
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
   const Matrix4f projectionMatrix =

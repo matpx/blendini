@@ -27,6 +27,8 @@ class App {
 
   Model monkey;
 
+  bool user_input_occured = true;
+
   App(const App &) = delete;
   App(App &&) = delete;
 

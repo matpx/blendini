@@ -4,7 +4,7 @@
 
 #include <entt/entt.hpp>
 
-#include "world.hpp"
+#include "sky.hpp"
 
 class Scene final : public entt::registry {
  public:
@@ -16,7 +16,7 @@ class Scene final : public entt::registry {
       .projection = CAMERA_PERSPECTIVE,
   };
 
-  World world;
+  Sky sky = {};
 
  public:
   Scene() = default;
