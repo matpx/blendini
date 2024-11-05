@@ -17,8 +17,11 @@ GfxContext::GfxContext() {
   rlImGuiSetup(true);
 
   pathtrace_area = {GetScreenWidth(), GetScreenHeight()};
-  pathtrace_image = GenImageColor(next_power_of_two(pathtrace_area.x()), next_power_of_two(pathtrace_area.y()), BLACK);
-  pathtrace_texture = LoadTextureFromImage(pathtrace_image);
+  image_swap_pair->write_image =
+      GenImageColor(next_power_of_two(pathtrace_area.x()), next_power_of_two(pathtrace_area.y()), BLACK);
+  image_swap_pair->read_image =
+      GenImageColor(next_power_of_two(pathtrace_area.x()), next_power_of_two(pathtrace_area.y()), BLACK);
+  pathtrace_texture = LoadTextureFromImage(image_swap_pair->read_image);
 
   default_shader =
       LoadShader(TextFormat("src/extern/raylib/examples/shaders/resources/shaders/glsl%i/lighting.vs", GLSL_VERSION),
@@ -37,7 +40,8 @@ GfxContext::~GfxContext() {
   UnloadMaterial(default_material);
 
   UnloadTexture(pathtrace_texture);
-  UnloadImage(pathtrace_image);
+  UnloadImage(image_swap_pair->read_image);
+  UnloadImage(image_swap_pair->write_image);
 
   rlImGuiShutdown();
   CloseWindow();

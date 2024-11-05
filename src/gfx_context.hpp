@@ -4,6 +4,9 @@
 #include <rlImGui/rlImGui.h>
 
 #include <Eigen/Dense>
+#include <memory>
+
+#include "image_swap_pair.hpp"
 
 #if defined(PLATFORM_DESKTOP)
 constexpr int32_t GLSL_VERSION = 330;
@@ -17,7 +20,9 @@ class GfxContext {
   GfxContext(GfxContext &&) = delete;
 
   Eigen::Vector2i pathtrace_area = {};
-  Image pathtrace_image = {};
+
+  std::shared_ptr<ImageSwapPair> image_swap_pair = std::make_shared<ImageSwapPair>();
+
   Texture2D pathtrace_texture = {};
 
   Shader default_shader;

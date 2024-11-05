@@ -2,9 +2,12 @@
 
 #include <raylib.h>
 
+#include <mutex>
+
+#include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
-App::App() {
+App::App() : pathtracer(gfx_context.image_swap_pair) {
   const entt::entity sphere_entity = scene.create();
   scene.emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
   scene.emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
@@ -74,14 +77,16 @@ void App::draw_pathtrace() {
     pathtracer.rebuild_tree(scene);
   }
 
-  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps,
-                         gfx_context.pathtrace_image);
+  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps);
 
   gfx_context.pathtrace_steps++;
 
-  Color *pathtrace_image_colors = LoadImageColors(gfx_context.pathtrace_image);
-  UpdateTexture(gfx_context.pathtrace_texture, pathtrace_image_colors);
-  UnloadImageColors(pathtrace_image_colors);
+  {
+    std::lock_guard image_swap_pair_lock(gfx_context.image_swap_pair->m);
+    Color *pathtrace_image_colors = LoadImageColors(gfx_context.image_swap_pair->read_image);
+    UpdateTexture(gfx_context.pathtrace_texture, pathtrace_image_colors);
+    UnloadImageColors(pathtrace_image_colors);
+  }
 
   DrawTexture(gfx_context.pathtrace_texture, 0, 0, {255, 255, 255, 255});
 }

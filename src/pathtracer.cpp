@@ -4,6 +4,7 @@
 #include <rlgl.h>
 
 #include <BS_thread_pool.hpp>
+#include <mutex>
 #include <random>
 
 #include "eigen_helper.hpp"
@@ -110,6 +111,8 @@ std::vector<Vector4f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree,
           .visibility = 0,
           .user_normal = {},
       };
+    } else {
+      next_ray.t = 0.0f;
     }
 
     next_batch[i_ray] = next_ray;
@@ -174,6 +177,8 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
   }
 }
 
+Pathtracer::Pathtracer(std::shared_ptr<ImageSwapPair> &image_swap_pair) : image_swap_pair(image_swap_pair) {}
+
 Pathtracer::~Pathtracer() {
   if (pathtrace_tree.nodes != nullptr) {
     rjm_freeraytree(&pathtrace_tree);
@@ -208,8 +213,7 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
 }
 
 void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, const Vector2i &pathtrace_area,
-                             const int32_t current_step, Image &target_image) {
-  assert(IsImageReady(target_image));
+                             const int32_t current_step) {
   assert(pathtrace_tree.nodes != nullptr);
 
   const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
@@ -235,7 +239,7 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
           .a = 255,
       };
 
-      ImageDrawPixel(&target_image, screen_coords.x(), screen_coords.y(), c);
+      ImageDrawPixel(&image_swap_pair->write_image, screen_coords.x(), screen_coords.y(), c);
     }
   };
 
@@ -243,4 +247,11 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
 
   thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 512);
   thread_pool.wait();
+
+  {
+    std::lock_guard image_swap_pair_lock(image_swap_pair->m);
+    assert(IsImageReady(image_swap_pair->write_image));
+
+    std::swap(image_swap_pair->read_image, image_swap_pair->write_image);
+  }
 }
