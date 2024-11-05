@@ -89,13 +89,11 @@ void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmR
       ray_batch[i_ray].user_normal[1] = ray_normal.y();
       ray_batch[i_ray].user_normal[2] = ray_normal.z();
 
-      Vector3f dir =
-          Vector3f{rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f), rand_thread_safe(-1.0f, 1.0f)}
-              .normalized();
+      constexpr float offset_length = 0.999f;
 
-      if (dir.dot(ray_normal) < 0) {
-        dir *= -1;
-      }
+      Vector3f dir = ray_normal + Vector3f{rand_thread_safe(-offset_length, offset_length),
+                                           rand_thread_safe(-offset_length, offset_length),
+                                           rand_thread_safe(-offset_length, offset_length)};
 
       next_ray = {
           .org = {ray_hitpoint.x(), ray_hitpoint.y(), ray_hitpoint.z()},
@@ -119,8 +117,8 @@ void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmR
       const Vector3f ray_normal = {ray_batch[i_ray].user_normal[0], ray_batch[i_ray].user_normal[1],
                                    ray_batch[i_ray].user_normal[2]};
 
-      light_values[i_ray] *=
-          ray_normal.dot(Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
+      light_values[i_ray] *= 0.6f;
+      // ray_normal.dot(Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
     }
   }
 }
