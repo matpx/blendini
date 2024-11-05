@@ -5,7 +5,8 @@ OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/imgui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/rlImGui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)*.cpp))
 
-FLAGS += -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src -isystem $(SOURCE)extern/imgui -isystem $(SOURCE)extern/eigen -isystem $(SOURCE)extern/entt/src -isystem $(SOURCE)extern/thread-pool/include
+FLAGS += -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src/ -isystem $(SOURCE)extern/imgui/
+FLAGS += -isystem $(SOURCE)extern/eigen/ -isystem $(SOURCE)extern/entt/src/ -isystem $(SOURCE)extern/thread-pool/include/
 FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
 FLAGS += -march=native
 
