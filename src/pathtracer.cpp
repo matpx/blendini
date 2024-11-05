@@ -60,21 +60,25 @@ void Pathtracer::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
   }
 }
 
-void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch, const int32_t depth,
-                              std::vector<Vector3f> &light_values) const {
+std::vector<Vector3f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
+                                               const int32_t depth) const {
   const int32_t hit_count =
       rjm_raytrace(&pathtrace_tree, ray_batch.size(), ray_batch.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
-  if (depth <= 1 || hit_count == 0) {
-    for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
-      if (ray_batch[i_ray].hit != -1) {
-        light_values[i_ray] = Vector3f{0.0f, 0.0f, 0.0f};
-      } else {
-        light_values[i_ray] = Vector3f{0.8f, 0.8f, 0.8f};
-      }
-    }
+  std::vector<Vector3f> light_values(ray_batch.size());
 
-    return;
+  for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
+    if (ray_batch[i_ray].hit != -1) {
+      light_values[i_ray] = Vector3f{0.0f, 0.0f, 0.0f};
+    } else {
+      const float sky_blend_factor = ray_batch[i_ray].dir[1] * 0.5f + 0.5f;
+      light_values[i_ray] =
+          (1.0 - sky_blend_factor) * Vector3f{1.0, 1.0, 1.0} + sky_blend_factor * Vector3f{0.5, 0.7, 1.0};
+    }
+  }
+
+  if (depth <= 1 || hit_count == 0) {
+    return light_values;
   }
 
   std::vector<RjmRay> next_batch(ray_batch.size());
@@ -95,6 +99,8 @@ void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmR
                                            rand_thread_safe(-offset_length, offset_length),
                                            rand_thread_safe(-offset_length, offset_length)};
 
+      dir.normalize();
+
       next_ray = {
           .org = {ray_hitpoint.x(), ray_hitpoint.y(), ray_hitpoint.z()},
           .dir = {dir.x(), dir.y(), dir.z()},
@@ -110,17 +116,19 @@ void Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmR
     next_batch[i_ray] = next_ray;
   }
 
-  trace_bounce(pathtrace_tree, next_batch, depth - 1, light_values);
+  std::vector<Vector3f> result_light_values = trace_bounce(pathtrace_tree, next_batch, depth - 1);
 
   for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
     if (ray_batch[i_ray].hit != -1) {
       const Vector3f ray_normal = {ray_batch[i_ray].user_normal[0], ray_batch[i_ray].user_normal[1],
                                    ray_batch[i_ray].user_normal[2]};
 
-      light_values[i_ray] *= 0.6f;
+      light_values[i_ray] = result_light_values[i_ray] * 0.8f;
       // ray_normal.dot(Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
     }
   }
+
+  return light_values;
 }
 
 void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &inv_view_proj, const Vector3f &origin,
@@ -150,8 +158,7 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
     };
   }
 
-  std::vector<Vector3f> light_values(ray_batch.size());
-  trace_bounce(pathtrace_tree, ray_batch, 4, light_values);
+  const std::vector<Vector3f> light_values = trace_bounce(pathtrace_tree, ray_batch, 4);
 
   for (int i_ray = start; i_ray < end; i_ray++) {
     const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};

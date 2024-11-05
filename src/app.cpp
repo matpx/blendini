@@ -20,8 +20,8 @@ App::App() {
 App::~App() { UnloadModel(monkey); }
 
 void App::process_inputs() {
-  if (IsKeyDown(KEY_SPACE)) {
-    UpdateCamera(&scene.camera, CAMERA_ORBITAL);
+  if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || GetMouseWheelMove() != 0.0f) {
+    UpdateCamera(&scene.camera, CAMERA_FREE);
 
     gfx_context.pathtrace_steps = 1;
   }

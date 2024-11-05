@@ -26,11 +26,12 @@ class Pathtracer {
 
   void rebuild_mesh(const Eigen::Isometry3f &transform, const Mesh &mesh);
 
-  void trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch, const int32_t depth,
-                    std::vector<Eigen::Vector3f> &light_values) const;
+  [[nodiscard]]
+  std::vector<Eigen::Vector3f> trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
+                                            const int32_t depth) const;
 
   void trace_screen(const Eigen::Vector2i &pathtrace_area, const Eigen::Matrix4f &inv_view_proj,
-                    const Eigen::Vector3f &origin, const int32_t start, const int32_t end, const int32_t steps);
+                    const Eigen::Vector3f &origin, const int32_t start, const int32_t end, const int32_t max_steps);
 
  public:
   Pathtracer() = default;
