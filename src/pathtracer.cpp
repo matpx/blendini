@@ -1,11 +1,10 @@
 #include "pathtracer.hpp"
 
-#include <raylib.h>
 #include <rlgl.h>
 
 #include <BS_thread_pool.hpp>
-#include <mutex>
 #include <random>
+#include <raylib-cpp.hpp>
 
 #include "eigen_helper.hpp"
 #include "math_helper.hpp"
@@ -61,8 +60,8 @@ void Pathtracer::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
   }
 }
 
-std::vector<Eigen::Vector4f> Pathtracer::trace_rays(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
-                                                    const int32_t depth) const {
+std::vector<Vector4f> Pathtracer::trace_rays(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
+                                             const int32_t depth) const {
   const int32_t hit_count =
       rjm_raytrace(&pathtrace_tree, ray_batch.size(), ray_batch.data(), RJM_RAYTRACE_FIRSTHIT, nullptr, nullptr);
 
@@ -198,12 +197,13 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
   pathtrace_vertices.clear();
   pathtrace_indices.clear();
 
-  for (const auto [entity, transform, mesh] : scene.view<const Isometry3f, const Mesh>().each()) {
-    rebuild_mesh(transform, mesh);
+  for (const auto [entity, transform, mesh] :
+       scene.view<const Isometry3f, const std::shared_ptr<raylib::Mesh>>().each()) {
+    rebuild_mesh(transform, *mesh);
   }
 
-  for (const auto [entity, transform, model] : scene.view<const Isometry3f, const Model>().each()) {
-    for (const Mesh &mesh : std::span<Mesh>(model.meshes, model.meshCount)) {
+  for (const auto [entity, transform, model] : scene.view<const Isometry3f, const std::shared_ptr<raylib::Model>>().each()) {
+    for (const Mesh &mesh : std::span<Mesh>(model->GetMeshes(), model->GetMeshCount())) {
       rebuild_mesh(transform, mesh);
     }
   }
@@ -215,8 +215,8 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
   rjm_buildraytree(&pathtrace_tree);
 }
 
-void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camera, const Vector2i &pathtrace_area,
-                             const int32_t current_step) {
+void Pathtracer::trace_image(BS::thread_pool &thread_pool, const raylib::Camera3D &camera,
+                             const Vector2i &pathtrace_area, const int32_t current_step) {
   assert(pathtrace_tree.nodes != nullptr);
   assert(IsImageReady(image_swap_pair->write_image));
 
@@ -243,7 +243,7 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const Camera3D &camer
           .a = 255,
       };
 
-      ImageDrawPixel(&image_swap_pair->write_image, screen_coords.x(), screen_coords.y(), c);
+      image_swap_pair->write_image.DrawPixel(screen_coords.x(), screen_coords.y(), c);
     }
   };
 

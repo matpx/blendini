@@ -1,19 +1,14 @@
 #pragma once
 
-#include <raylib.h>
-
 #include <entt/entt.hpp>
+#include <raylib-cpp.hpp>
 
 #include "sky.hpp"
 
 class Scene final : public entt::registry {
  public:
-  Camera3D camera = {
-      .position = Vector3{8.0f, 4.0f, 8.0f},
-      .target = Vector3{0.0f, 0.0f, 0.0f},
-      .up = Vector3{0.0f, 1.0f, 0.0f},
-      .fovy = 45.0f,
-      .projection = CAMERA_PERSPECTIVE,
+  raylib::Camera3D camera = {
+      Vector3{8.0f, 4.0f, 8.0f}, Vector3{0.0f, 0.0f, 0.0f}, Vector3{0.0f, 1.0f, 0.0f}, 45.0f, CAMERA_PERSPECTIVE,
   };
 
   Sky sky = {};
@@ -22,5 +17,4 @@ class Scene final : public entt::registry {
   Scene() = default;
   Scene(const Scene &) = delete;
   Scene(Scene &&) = delete;
-  ~Scene();
 };

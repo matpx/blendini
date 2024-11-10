@@ -1,10 +1,10 @@
 #pragma once
 
-#include <raylib.h>
 #include <rlImGui/rlImGui.h>
 
 #include <Eigen/Dense>
 #include <memory>
+#include <raylib-cpp.hpp>
 
 #include "image_swap_pair.hpp"
 
@@ -19,14 +19,13 @@ class GfxContext {
   GfxContext(const GfxContext &) = delete;
   GfxContext(GfxContext &&) = delete;
 
-  Eigen::Vector2i pathtrace_area = {};
+  raylib::Window window;
 
   std::shared_ptr<ImageSwapPair> image_swap_pair = std::make_shared<ImageSwapPair>();
 
-  Texture2D pathtrace_texture = {};
+  raylib::Texture2D pathtrace_texture;
 
-  Shader default_shader;
-  Material default_material;
+  raylib::Material default_material;
 
   int32_t pathtrace_steps = 0;
 

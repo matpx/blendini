@@ -1,6 +1,6 @@
 #pragma once
 
-#include <raylib.h>
+#include <raylib-cpp.hpp>
 
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
@@ -49,7 +49,7 @@ class Pathtracer {
   ~Pathtracer();
 
   void rebuild_tree(const Scene &scene);
-  void trace_image(BS::thread_pool &pool, const Camera3D &camera, const Eigen::Vector2i &pathtrace_area,
+  void trace_image(BS::thread_pool &pool, const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area,
                    const int32_t current_step);
 
   [[nodiscard]]

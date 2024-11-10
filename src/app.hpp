@@ -13,8 +13,7 @@ class App {
     PATHTRACE,
   };
 
-  private:
-
+ private:
   Mode current_mode = Mode::VIEWPORT;
 
  public:
@@ -25,7 +24,7 @@ class App {
   Scene scene;
   Pathtracer pathtracer;
 
-  Model monkey;
+  std::shared_ptr<raylib::Model> monkey = std::make_shared<raylib::Model>("monkey.glb");
 
   bool user_input_occured = true;
 
@@ -33,7 +32,6 @@ class App {
   App(App &&) = delete;
 
   App();
-  ~App();
 
   void process_inputs();
   void draw_viewport();

@@ -1,40 +1,45 @@
 #include "app.hpp"
+#include <imgui.h>
 
-#include <raylib.h>
-
+#include <Keyboard.hpp>
+#include <Material.hpp>
+#include <Mesh.hpp>
+#include <Mouse.hpp>
+#include <memory>
 #include <mutex>
+#include <raylib-cpp.hpp>
 
 #include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
 App::App() : pathtracer(gfx_context.image_swap_pair) {
   const entt::entity sphere_entity = scene.create();
-  scene.emplace<Mesh>(sphere_entity, GenMeshSphere(1, 8, 8));
+  scene.emplace<std::shared_ptr<raylib::Mesh>>(sphere_entity,
+                                               std::make_shared<raylib::Mesh>(raylib::Mesh::Sphere(1, 8, 8)));
   scene.emplace<Eigen::Isometry3f>(sphere_entity, Eigen::Isometry3f::Identity());
   scene.get<Eigen::Isometry3f>(sphere_entity).translate(Eigen::Vector3f{3, 1, 0});
 
   const entt::entity floor_entity = scene.create();
-  scene.emplace<Mesh>(floor_entity, GenMeshPlane(10, 10, 10, 10));
+  scene.emplace<std::shared_ptr<raylib::Mesh>>(floor_entity,
+                                               std::make_shared<raylib::Mesh>(raylib::Mesh::Plane(10, 10, 10, 10)));
   scene.emplace<Eigen::Isometry3f>(floor_entity, Eigen::Isometry3f::Identity());
 
-  monkey = LoadModel("monkey.glb");
   const entt::entity monkey_entity = scene.create();
-  scene.emplace<Model>(monkey_entity, monkey);
+  scene.emplace<std::shared_ptr<raylib::Model>>(monkey_entity, monkey);
   scene.emplace<Eigen::Isometry3f>(monkey_entity, Eigen::Isometry3f::Identity());
   scene.get<Eigen::Isometry3f>(monkey_entity).translate(Eigen::Vector3f{0, 1, 0});
 }
 
-App::~App() { UnloadModel(monkey); }
-
 void App::process_inputs() {
-  user_input_occured = IsMouseButtonDown(MOUSE_RIGHT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) ||
-                       IsKeyDown(KEY_F1) || GetMouseWheelMove() != 0.0f;
+  user_input_occured = raylib::Mouse::IsButtonDown(MOUSE_RIGHT_BUTTON) ||
+                       raylib::Mouse::IsButtonDown(MOUSE_MIDDLE_BUTTON) || raylib::Keyboard::IsKeyDown(KEY_F1) ||
+                       raylib::Mouse::GetWheelMove() != 0.0f;
 
   if (user_input_occured) {
-    UpdateCamera(&scene.camera, CAMERA_FREE);
+    scene.camera.Update(CAMERA_FREE);
   }
 
-  if (IsKeyPressed(KEY_F1)) {
+  if (raylib::Keyboard::IsKeyPressed(KEY_F1)) {
     current_mode = current_mode == Mode::VIEWPORT ? Mode::PATHTRACE : Mode::VIEWPORT;
   }
 }
@@ -44,27 +49,22 @@ void App::draw_viewport() {
     return;
   }
 
-  SetShaderValue(gfx_context.default_shader, gfx_context.default_shader.locs[SHADER_LOC_VECTOR_VIEW],
-                 &scene.camera.position, SHADER_UNIFORM_VEC3);
-
-  SetShaderValue(gfx_context.default_shader, gfx_context.default_shader.locs[SHADER_LOC_COLOR_AMBIENT],
-                 scene.sky.top_color.data(), SHADER_UNIFORM_VEC4);
-
-  BeginMode3D(scene.camera);
+  scene.camera.BeginMode();
 
   DrawGrid(10, 1.0f);
 
-  for (const auto [entity, transform, mesh] : scene.view<const Eigen::Isometry3f, const Mesh>().each()) {
-    DrawMesh(mesh, gfx_context.default_material, tr(transform.matrix()));
+  for (const auto [entity, transform, mesh] :
+       scene.view<const Eigen::Isometry3f, const std::shared_ptr<raylib::Mesh>>().each()) {
+    mesh->Draw(gfx_context.default_material, tr(transform.matrix()));
   }
 
-  for (const auto [entity, transform, model] : scene.view<const Eigen::Isometry3f, const Model>().each()) {
-    model.materials[0].shader = gfx_context.default_shader;
-    DrawModel(model, Vector3{transform.translation().x(), transform.translation().y(), transform.translation().z()},
-              1.0f, WHITE);
+  for (const auto [entity, transform, model] :
+       scene.view<const Eigen::Isometry3f, const std::shared_ptr<raylib::Model>>().each()) {
+    model->Draw(Vector3{transform.translation().x(), transform.translation().y(), transform.translation().z()}, 1.0f,
+                WHITE);
   }
 
-  EndMode3D();
+  scene.camera.EndMode();
 }
 
 void App::draw_pathtrace() {
@@ -77,18 +77,21 @@ void App::draw_pathtrace() {
     pathtracer.rebuild_tree(scene);
   }
 
-  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.pathtrace_area, gfx_context.pathtrace_steps);
+  pathtracer.trace_image(thread_pool, scene.camera, {gfx_context.window.GetWidth(), gfx_context.window.GetHeight()},
+                         gfx_context.pathtrace_steps);
 
   gfx_context.pathtrace_steps++;
 
-  gfx_context.image_swap_pair->swap_mutex.lock();
-  Color *pathtrace_image_colors = LoadImageColors(gfx_context.image_swap_pair->read_image);
-  gfx_context.image_swap_pair->swap_mutex.unlock();
+  Color *pathtrace_image_colors = nullptr;
+  {
+    std::lock_guard lock(gfx_context.image_swap_pair->swap_mutex);
+    pathtrace_image_colors = gfx_context.image_swap_pair->read_image.LoadColors();
+  }
 
-  UpdateTexture(gfx_context.pathtrace_texture, pathtrace_image_colors);
-  UnloadImageColors(pathtrace_image_colors);
+  gfx_context.pathtrace_texture.Update(pathtrace_image_colors);
+  gfx_context.image_swap_pair->read_image.UnloadColors(pathtrace_image_colors);
 
-  DrawTexture(gfx_context.pathtrace_texture, 0, 0, {255, 255, 255, 255});
+  gfx_context.pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
 }
 
 void App::draw_viewport_ui() {
@@ -99,25 +102,24 @@ void App::draw_viewport_ui() {
 
   rlImGuiEnd();
 
-  DrawFPS(10, 10);
+  gfx_context.window.DrawFPS(10, 10);
 }
 
 void App::update() {
   process_inputs();
 
-  BeginDrawing();
-
-  ClearBackground(GRAY);
+  gfx_context.window.BeginDrawing();
+  gfx_context.window.ClearBackground(GRAY);
 
   draw_viewport();
   draw_pathtrace();
   draw_viewport_ui();
 
-  EndDrawing();
+  gfx_context.window.EndDrawing();
 }
 
 void App::run() {
-  while (!WindowShouldClose()) {
+  while (!gfx_context.window.ShouldClose()) {
     update();
   }
 }
