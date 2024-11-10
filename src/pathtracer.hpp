@@ -32,6 +32,10 @@ class Pathtracer {
   void rebuild_mesh(const Eigen::Isometry3f &transform, const Mesh &mesh);
 
   [[nodiscard]]
+  std::vector<Eigen::Vector4f> trace_rays(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
+                                          const int32_t depth) const;
+
+  [[nodiscard]]
   std::vector<Eigen::Vector4f> trace_bounce(const RjmRayTree &pathtrace_tree, std::vector<RjmRay> &ray_batch,
                                             const int32_t depth) const;
 
