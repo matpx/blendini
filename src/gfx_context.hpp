@@ -23,8 +23,6 @@ class GfxContext {
 
   std::shared_ptr<ImageSwapPair> image_swap_pair = std::make_shared<ImageSwapPair>();
 
-  raylib::Texture2D pathtrace_texture;
-
   raylib::Material default_material;
 
   int32_t pathtrace_steps = 0;

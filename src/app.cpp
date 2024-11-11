@@ -1,4 +1,5 @@
 #include "app.hpp"
+
 #include <imgui.h>
 
 #include <Keyboard.hpp>
@@ -77,21 +78,12 @@ void App::draw_pathtrace() {
     pathtracer.rebuild_tree(scene);
   }
 
-  pathtracer.trace_image(thread_pool, scene.camera, {gfx_context.window.GetWidth(), gfx_context.window.GetHeight()},
-                         gfx_context.pathtrace_steps);
+  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.image_swap_pair->size, gfx_context.pathtrace_steps);
 
   gfx_context.pathtrace_steps++;
 
-  Color *pathtrace_image_colors = nullptr;
-  {
-    std::lock_guard lock(gfx_context.image_swap_pair->swap_mutex);
-    pathtrace_image_colors = gfx_context.image_swap_pair->read_image.LoadColors();
-  }
-
-  gfx_context.pathtrace_texture.Update(pathtrace_image_colors);
-  gfx_context.image_swap_pair->read_image.UnloadColors(pathtrace_image_colors);
-
-  gfx_context.pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
+  gfx_context.image_swap_pair->update_texture();
+  gfx_context.image_swap_pair->pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
 }
 
 void App::draw_viewport_ui() {
