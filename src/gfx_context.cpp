@@ -1,9 +1,6 @@
 #include "gfx_context.hpp"
 
-#include <raylib.h>
-
-#include <cassert>
-#include <raylib-cpp.hpp>
+#include <rlImGui/rlImGui.h>
 
 GfxContext::GfxContext()
     : window(1920, 1080, "Blendini", FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT),

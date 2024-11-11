@@ -1,7 +1,5 @@
 #pragma once
 
-#include <raylib-cpp.hpp>
-
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 

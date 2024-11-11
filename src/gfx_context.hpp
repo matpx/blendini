@@ -1,10 +1,6 @@
 #pragma once
 
-#include <rlImGui/rlImGui.h>
-
-#include <Eigen/Dense>
 #include <memory>
-#include <raylib-cpp.hpp>
 
 #include "image_swap_pair.hpp"
 

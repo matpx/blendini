@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <raylib-cpp.hpp>
 
 #include "math_helper.hpp"

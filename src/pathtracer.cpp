@@ -3,11 +3,8 @@
 #include <rlgl.h>
 
 #include <BS_thread_pool.hpp>
-#include <random>
-#include <raylib-cpp.hpp>
 
 #include "eigen_helper.hpp"
-#include "math_helper.hpp"
 #include "raymath_helper.hpp"
 #include "scene.hpp"
 
@@ -202,7 +199,8 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
     rebuild_mesh(transform, *mesh);
   }
 
-  for (const auto [entity, transform, model] : scene.view<const Isometry3f, const std::shared_ptr<raylib::Model>>().each()) {
+  for (const auto [entity, transform, model] :
+       scene.view<const Isometry3f, const std::shared_ptr<raylib::Model>>().each()) {
     for (const Mesh &mesh : std::span<Mesh>(model->GetMeshes(), model->GetMeshCount())) {
       rebuild_mesh(transform, mesh);
     }

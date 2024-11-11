@@ -89,6 +89,4 @@ Eigen::Matrix<Scalar, 4, 4> ortho(Scalar const& left, Scalar const& right, Scala
   return mat;
 }
 
-
-
 }  // namespace Eigen

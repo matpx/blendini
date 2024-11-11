@@ -1,16 +1,7 @@
 #include "app.hpp"
 
-#include <imgui.h>
+#include <rlImGui/rlImGui.h>
 
-#include <Keyboard.hpp>
-#include <Material.hpp>
-#include <Mesh.hpp>
-#include <Mouse.hpp>
-#include <memory>
-#include <mutex>
-#include <raylib-cpp.hpp>
-
-#include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
 App::App() : pathtracer(gfx_context.image_swap_pair) {
