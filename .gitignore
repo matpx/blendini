@@ -1,5 +1,6 @@
 /.cache/
 /compile_commands.json
+/compile_commands.events.json
 
 /src/*.o
 /src/*.d
