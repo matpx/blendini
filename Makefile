@@ -1,42 +1,45 @@
-SOURCE += src/
-RAYLIB_PATH += $(SOURCE)extern/raylib/src/
+SOURCE = src/
+RAYLIB_PATH = $(SOURCE)extern/raylib/src/
+ARCH = -march=native
 
-OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/imgui/*.cpp))
+OBJS  = $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/imgui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/rlImGui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)*.cpp))
 
-FLAGS += -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src/ -isystem $(SOURCE)extern/raylib-cpp/include/ -isystem $(SOURCE)extern/imgui/
-FLAGS += -isystem $(SOURCE)extern/eigen/ -isystem $(SOURCE)extern/entt/src/ -isystem $(SOURCE)extern/thread-pool/include/
-FLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
-FLAGS += -march=native
+CFLAGS  = -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src/ -isystem $(SOURCE)extern/raylib-cpp/include/ -isystem $(SOURCE)extern/imgui/
+CFLAGS += -isystem $(SOURCE)extern/eigen/ -isystem $(SOURCE)extern/entt/src/ -isystem $(SOURCE)extern/thread-pool/include/
+CFLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
+CFLAGS += $(ARCH)
 
 ifdef DEBUG
-	FLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
-	FLAGS += -D_GLIBCXX_ASSERTIONS
-	FLAGS += -Og -g
+	CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+	CFLAGS += -D_GLIBCXX_ASSERTIONS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
+	CFLAGS += -Og -g -D_DEBUG
 
-	RAYLIB_MODE ?= DEBUG
+	RAYLIB_MODE = DEBUG
+	RAYLIB_CUSTOM_CFLAGS = $(ARCH)
 else
-	FLAGS += -O3
+	CFLAGS += -O3 -flto
 
 	ifdef NOSAFETY
-		FLAGS += -DNDEBUG
+		CFLAGS += -DNDEBUG
 	endif
 
-	RAYLIB_MODE ?= RELEASE
+	RAYLIB_MODE = RELEASE
+	RAYLIB_CUSTOM_CFLAGS = $(ARCH) -flto
 endif
 
 blendini: $(OBJS) $(RAYLIB_PATH)libraylib.a
-	$(CXX) -o blendini $^ $(FLAGS)
+	$(CXX) -o blendini $^ $(CFLAGS)
 
 %.o: %.cpp
-	$(CXX) -o $@ -c $< $(FLAGS)
-	$(CXX) -MM -MT $@ -MF $(@:.o=.d) $< $(FLAGS)
+	$(CXX) -o $@ -c $< $(CFLAGS)
+	$(CXX) -MM -MT $@ -MF $(@:.o=.d) $< $(CFLAGS)
 
 -include $(OBJS:.o=.d)
 
 $(RAYLIB_PATH)libraylib.a:
-	$(MAKE) -C $(RAYLIB_PATH) RAYLIB_BUILD_MODE=$(RAYLIB_MODE)
+	$(MAKE) -C $(RAYLIB_PATH) RAYLIB_BUILD_MODE=$(RAYLIB_MODE) CUSTOM_CFLAGS="$(RAYLIB_CUSTOM_CFLAGS)"
 
 .PHONY: clean
 
