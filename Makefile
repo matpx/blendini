@@ -11,13 +11,15 @@ CFLAGS += -isystem $(SOURCE)extern/eigen/ -isystem $(SOURCE)extern/entt/src/ -is
 CFLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
 CFLAGS += $(ARCH)
 
+SAFETY_FLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
+SAFETY_FLAGS += -D_GLIBCXX_ASSERTIONS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
+
 ifdef DEBUG
-	CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
-	CFLAGS += -D_GLIBCXX_ASSERTIONS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
 	CFLAGS += -Og -g -D_DEBUG
+	CFLAGS += $(SAFETY_FLAGS)
 
 	RAYLIB_MODE = DEBUG
-	RAYLIB_CUSTOM_CFLAGS = $(ARCH)
+	RAYLIB_CUSTOM_CFLAGS = $(ARCH) $(SAFETY_FLAGS)
 else
 	CFLAGS += -O3 -flto
 
