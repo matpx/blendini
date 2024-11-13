@@ -225,6 +225,11 @@ int32_t rjm_raytrace(const RjmRayTree *tree, const int32_t nrays, RjmRay *rays, 
           __m128 e02y = _mm_set1_ps(v2[1] - v0[1]);
           __m128 e02z = _mm_set1_ps(v2[2] - v0[2]);
 
+          // normal = cross(e01, e02)
+          __m128 normalx = _mm_sub_ps(_mm_mul_ps(e01y, e02z), _mm_mul_ps(e01z, e02y));
+          __m128 normaly = _mm_sub_ps(_mm_mul_ps(e01z, e02x), _mm_mul_ps(e01x, e02z));
+          __m128 normalz = _mm_sub_ps(_mm_mul_ps(e01x, e02y), _mm_mul_ps(e01y, e02x));
+
           // Ray-triangle intersection.
           __m128 mask = _mm_setzero_ps();
           for (int32_t n = 0; n < nvec; n++) {
@@ -303,13 +308,9 @@ int32_t rjm_raytrace(const RjmRayTree *tree, const int32_t nrays, RjmRay *rays, 
                       ray->v = out_v[n];
                       ray->hit = triIdx;
                       ray->visibility = 0.0f;
-
-                      ray->normal[0] =
-                          _mm_cvtss_f32(e01y) * _mm_cvtss_f32(e02z) - _mm_cvtss_f32(e01z) * _mm_cvtss_f32(e02y);
-                      ray->normal[1] =
-                          _mm_cvtss_f32(e01z) * _mm_cvtss_f32(e02x) - _mm_cvtss_f32(e01x) * _mm_cvtss_f32(e02z);
-                      ray->normal[2] =
-                          _mm_cvtss_f32(e01x) * _mm_cvtss_f32(e02y) - _mm_cvtss_f32(e01y) * _mm_cvtss_f32(e02x);
+                      ray->normal[0] = _mm_cvtss_f32(normalx);
+                      ray->normal[1] = _mm_cvtss_f32(normaly);
+                      ray->normal[2] = _mm_cvtss_f32(normalz);
 
                       hit_count++;
 
