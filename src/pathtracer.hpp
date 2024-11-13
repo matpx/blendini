@@ -4,7 +4,7 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include "image_swap_pair.hpp"
-#include "rjm_raytrace_fork.h"
+#include "rjm_raytrace.hpp"
 #include "sky.hpp"
 
 namespace BS {
@@ -24,9 +24,6 @@ class Pathtracer {
   Sky sky = {};
 
  private:
-  [[nodiscard]]
-  std::pair<Eigen::Vector3f, Eigen::Vector3f> get_ray(const RjmRay &ray) const;
-
   void rebuild_mesh(const Eigen::Isometry3f &transform, const Mesh &mesh);
 
   [[nodiscard]]

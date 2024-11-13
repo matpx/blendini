@@ -17,24 +17,20 @@ static float rand_thread_safe(const float min, const float max) {
   return distribution(generator);
 }
 
-[[nodiscard]]
-std::pair<Vector3f, Vector3f> Pathtracer::get_ray(const RjmRay &ray) const {
-  const std::array<int32_t, 3> triangle_indices = {pathtrace_indices[ray.hit * 3], pathtrace_indices[ray.hit * 3 + 1],
-                                                   pathtrace_indices[ray.hit * 3 + 2]};
+inline static std::pair<Vector3f, Vector3f> new_origin_and_dir(const RjmRay &ray) {
+  constexpr float offset_length = 0.999f;
 
-  const std::array<Vector3f, 3> triangle_vertices = {pathtrace_vertices[triangle_indices[0]],
-                                                     pathtrace_vertices[triangle_indices[1]],
-                                                     pathtrace_vertices[triangle_indices[2]]};
+  const Vector3f origin = Vector3f{ray.org[0], ray.org[1], ray.org[2]};
+  const Vector3f dir = Vector3f{ray.dir[0], ray.dir[1], ray.dir[2]};
+  const Vector3f normal = Vector3f{ray.normal[0], ray.normal[1], ray.normal[2]}.normalized();
+  const Vector3f sphere_offset =
+      Vector3f{rand_thread_safe(-offset_length, offset_length), rand_thread_safe(-offset_length, offset_length),
+               rand_thread_safe(-offset_length, offset_length)};
 
-  const Vector3f normal =
-      (triangle_vertices[1] - triangle_vertices[0]).cross(triangle_vertices[2] - triangle_vertices[0]).normalized();
+  const Vector3f new_origin = (origin + dir * ray.t) + normal * std::numeric_limits<float>::epsilon() * 10.0f;
+  const Vector3f new_dir = (normal + sphere_offset).normalized();
 
-  const Vector3f origin =
-      (1.0f - ray.u - ray.v) * triangle_vertices[0] + ray.u * triangle_vertices[1] + ray.v * triangle_vertices[2];
-
-  const Vector3f offset_origin = origin + normal * 0.00001f;
-
-  return {offset_origin, normal};
+  return {new_origin, new_dir};
 }
 
 void Pathtracer::rebuild_mesh(const Isometry3f &transform, const Mesh &mesh) {
@@ -78,11 +74,7 @@ std::vector<Vector4f> Pathtracer::trace_rays(const RjmRayTree &pathtrace_tree, s
 
     for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
       if (ray_batch[i_ray].hit != -1) {
-        const Vector3f ray_normal = {ray_batch[i_ray].user_normal[0], ray_batch[i_ray].user_normal[1],
-                                     ray_batch[i_ray].user_normal[2]};
-
         light_values[i_ray] = result_light_values[i_ray] * 0.8f;
-        // ray_normal.dot(Vector3f{next_batch[i_ray].dir[0], next_batch[i_ray].dir[1], next_batch[i_ray].dir[2]});
       }
     }
   }
@@ -95,32 +87,22 @@ std::vector<Vector4f> Pathtracer::trace_bounce(const RjmRayTree &pathtrace_tree,
   std::vector<RjmRay> next_batch(ray_batch.size());
 
   for (size_t i_ray = 0; i_ray < ray_batch.size(); i_ray++) {
+    const RjmRay &ray = ray_batch[i_ray];
+
     RjmRay next_ray = {};
 
-    if (ray_batch[i_ray].hit != -1) {
-      const auto [ray_hitpoint, ray_normal] = get_ray(ray_batch[i_ray]);
-
-      ray_batch[i_ray].user_normal[0] = ray_normal.x();
-      ray_batch[i_ray].user_normal[1] = ray_normal.y();
-      ray_batch[i_ray].user_normal[2] = ray_normal.z();
-
-      constexpr float offset_length = 0.999f;
-
-      Vector3f dir = ray_normal + Vector3f{rand_thread_safe(-offset_length, offset_length),
-                                           rand_thread_safe(-offset_length, offset_length),
-                                           rand_thread_safe(-offset_length, offset_length)};
-
-      dir.normalize();
+    if (ray.hit != -1) {
+      const auto [new_origin, new_dir] = new_origin_and_dir(ray);
 
       next_ray = {
-          .org = {ray_hitpoint.x(), ray_hitpoint.y(), ray_hitpoint.z()},
-          .dir = {dir.x(), dir.y(), dir.z()},
+          .org = {new_origin.x(), new_origin.y(), new_origin.z()},
+          .dir = {new_dir.x(), new_dir.y(), new_dir.z()},
           .t = 100,
           .hit = 0,
           .u = 0,
           .v = 0,
           .visibility = 0,
-          .user_normal = {},
+          .normal = {},
       };
     } else {
       next_ray.t = 0.0f;
@@ -155,7 +137,7 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
         .u = 0,
         .v = 0,
         .visibility = 0,
-        .user_normal = {},
+        .normal = {},
     };
   }
 
