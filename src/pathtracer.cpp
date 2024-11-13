@@ -10,6 +10,8 @@
 
 using namespace Eigen;
 
+constexpr float SMALL_NUMBER = std::numeric_limits<float>::epsilon() * 10.0f;
+
 [[nodiscard]]
 static float rand_thread_safe(const float min, const float max) {
   static thread_local std::mt19937 generator;
@@ -18,7 +20,7 @@ static float rand_thread_safe(const float min, const float max) {
 }
 
 inline static std::pair<Vector3f, Vector3f> new_origin_and_dir(const RjmRay &ray) {
-  constexpr float offset_length = 0.999f;
+  constexpr float offset_length = 1.0f - SMALL_NUMBER;
 
   const Vector3f origin = Vector3f{ray.org[0], ray.org[1], ray.org[2]};
   const Vector3f dir = Vector3f{ray.dir[0], ray.dir[1], ray.dir[2]};
@@ -27,7 +29,7 @@ inline static std::pair<Vector3f, Vector3f> new_origin_and_dir(const RjmRay &ray
       Vector3f{rand_thread_safe(-offset_length, offset_length), rand_thread_safe(-offset_length, offset_length),
                rand_thread_safe(-offset_length, offset_length)};
 
-  const Vector3f new_origin = (origin + dir * ray.t) + normal * std::numeric_limits<float>::epsilon() * 10.0f;
+  const Vector3f new_origin = (origin + dir * ray.t) + normal * SMALL_NUMBER;
   const Vector3f new_dir = (normal + sphere_offset).normalized();
 
   return {new_origin, new_dir};
@@ -229,7 +231,7 @@ void Pathtracer::trace_image(BS::thread_pool &thread_pool, const raylib::Camera3
 
   const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
 
-  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 512);
+  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 1024);
   thread_pool.wait();
 
   image_swap_pair->swap();

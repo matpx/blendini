@@ -10,7 +10,7 @@
 constexpr int32_t RJM_MAX_RAYTREE_LEAF_TRIS = 4;
 
 // Tweak for maximum rays to trace at once (limited by stack space, must be multiple of 4)
-constexpr int32_t RJM_PACKET_SIZE = 64;
+constexpr int32_t RJM_PACKET_SIZE = 128;
 
 struct RjmRayNode {
   float bmin[3], bmax[3];

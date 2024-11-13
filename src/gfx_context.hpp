@@ -17,7 +17,7 @@ class GfxContext {
 
   raylib::Window window;
 
-  std::shared_ptr<ImageSwapPair> image_swap_pair = std::make_shared<ImageSwapPair>();
+  std::shared_ptr<ImageSwapPair> image_swap_pair;
 
   raylib::Material default_material;
 
