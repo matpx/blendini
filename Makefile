@@ -9,6 +9,7 @@ OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)*.cpp))
 CFLAGS  = -isystem $(SOURCE)extern/ -isystem $(SOURCE)extern/raylib/src/ -isystem $(SOURCE)extern/raylib-cpp/include/ -isystem $(SOURCE)extern/imgui/
 CFLAGS += -isystem $(SOURCE)extern/eigen/ -isystem $(SOURCE)extern/entt/src/ -isystem $(SOURCE)extern/thread-pool/include/
 CFLAGS += -std=c++20 -Wall -Wextra -Wpedantic -I$(RAYLIB_PATH)
+CFLAGS += -fopenmp-simd -DSIMDE_ENABLE_OPENMP
 CFLAGS += $(ARCH)
 
 SAFETY_FLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
