@@ -1,6 +1,7 @@
+ARCH ?= -march=native -mavx512f
+
 SOURCE = src/
 RAYLIB_PATH = $(SOURCE)extern/raylib/src/
-ARCH = -march=native
 
 OBJS  = $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/imgui/*.cpp))
 OBJS += $(patsubst %.cpp,%.o,$(wildcard $(SOURCE)extern/rlImGui/*.cpp))
