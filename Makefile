@@ -1,4 +1,4 @@
-ARCH ?= -march=native -mavx512f
+ARCH ?= -march=native
 
 SOURCE = src/
 RAYLIB_PATH = $(SOURCE)extern/raylib/src/
