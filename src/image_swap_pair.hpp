@@ -18,7 +18,7 @@ struct ImageSwapPair {
   ImageSwapPair(ImageSwapPair &&) = delete;
   ImageSwapPair(const Eigen::Vector2i &size)
       : size(size),
-        write_image(next_power_of_two(size.x()), next_power_of_two(size.y()), BLACK),
+        write_image(next_power_of_two(size.x()), next_power_of_two(size.y()), raylib::Color{0, 0, 0, 0}),
         read_image(write_image),
         pathtrace_texture(read_image) {}
 

@@ -10,7 +10,7 @@
 
 using namespace Eigen;
 
-constexpr float SMALL_NUMBER = std::numeric_limits<float>::epsilon() * 10.0f;
+constexpr float SMALL_NUMBER = std::numeric_limits<float>::epsilon() * 100.0f;
 
 [[nodiscard]]
 static float rand_thread_safe(const float min, const float max) {
@@ -233,12 +233,11 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
 }
 
 void Pathtracer::stop() {
-  if (is_idle()) {
-    return;
+  status = Status::ABORT;
+  if (render_future.valid()) {
+    render_future.wait();
   }
-
-  should_stop = true;
-  render_future.wait();
+  status = Status::STOPPED;
 }
 
 void Pathtracer::start(const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area, const int32_t steps) {
@@ -249,12 +248,17 @@ void Pathtracer::start(const raylib::Camera3D &camera, const Eigen::Vector2i &pa
     return;
   }
 
-  should_stop = false;
+  status = Status::RUNNING;
+
+  image_swap_pair->write_image.ClearBackground(raylib::Color{0, 0, 0, 0});
+  image_swap_pair->swap();
+  image_swap_pair->write_image.ClearBackground(raylib::Color{0, 0, 0, 0});
 
   render_future = std::async([=, this]() {
     for (int32_t i_step = 0; i_step < steps; i_step++) {
-      if (should_stop) {
-        return;
+      if (status == Status::ABORT) {
+        status = Status::STOPPED;
+        break;
       }
 
       const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
@@ -267,5 +271,7 @@ void Pathtracer::start(const raylib::Camera3D &camera, const Eigen::Vector2i &pa
 
       trace_image(inv_view_proj, origin, pathtrace_area, i_step);
     }
+
+    status = Status::FINISHED;
   });
 }

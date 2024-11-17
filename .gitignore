@@ -6,6 +6,10 @@
 /src/*.d
 /src/*.o.tmp
 
+src/extern/raylib/src/*.o
+src/extern/raylib/src/*.d
+src/extern/raylib/src/*.o.tmp
+
 src/extern/imgui/*.o
 src/extern/imgui/*.d
 src/extern/imgui/*.o.tmp

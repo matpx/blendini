@@ -2,6 +2,7 @@
 
 #include <rlImGui/rlImGui.h>
 
+#include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
 App::App() : thread_pool(std::make_shared<BS::thread_pool>(11)), pathtracer(thread_pool, gfx_context.image_swap_pair) {
@@ -37,10 +38,6 @@ void App::process_inputs() {
 }
 
 void App::draw_viewport() {
-  if (current_mode != Mode::VIEWPORT) {
-    return;
-  }
-
   scene.camera.BeginMode();
 
   DrawGrid(10, 1.0f);
@@ -64,13 +61,15 @@ void App::draw_pathtrace() {
     return;
   }
 
-  if ((pathtracer.is_idle() && !pathtracer.is_finished()) || user_input_occured) {
+  if (user_input_occured) {
+    pathtracer.status = Pathtracer::Status::ABORT;
+  } else if (pathtracer.status == Pathtracer::Status::STOPPED || pathtracer.status == Pathtracer::Status::ABORT) {
     pathtracer.rebuild_tree(scene);
-    pathtracer.start(scene.camera, gfx_context.image_swap_pair->size, 32);
+    pathtracer.start(scene.camera, gfx_context.image_swap_pair->size, 128);
+  } else {
+    gfx_context.image_swap_pair->update_texture();
+    gfx_context.image_swap_pair->pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
   }
-
-  gfx_context.image_swap_pair->update_texture();
-  gfx_context.image_swap_pair->pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
 }
 
 void App::draw_viewport_ui() {

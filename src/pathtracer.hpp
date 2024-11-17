@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <atomic>
 #include <future>
 #include <unsupported/Eigen/CXX11/Tensor>
 
@@ -16,6 +15,14 @@ class thread_pool;
 class Scene;
 
 class Pathtracer {
+ public:
+  enum class Status {
+    STOPPED,
+    RUNNING,
+    FINISHED,
+    ABORT,
+  };
+
  private:
   std::shared_ptr<BS::thread_pool> pool;
   std::shared_ptr<ImageSwapPair> image_swap_pair;
@@ -26,7 +33,6 @@ class Pathtracer {
   Eigen::Tensor<float, 3> pathtrace_buffer;
   Sky sky = {};
 
-  std::atomic<bool> should_stop = false;
   std::future<void> render_future;
 
  private:
@@ -52,18 +58,10 @@ class Pathtracer {
   Pathtracer(Pathtracer &&) = delete;
   ~Pathtracer();
 
+  Status status = Status::STOPPED;
+
   void rebuild_tree(const Scene &scene);
 
   void stop();
   void start(const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area, const int32_t steps);
-
-  [[nodiscard]]
-  bool is_idle() const {
-    return !render_future.valid() || render_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-  }
-
-  [[nodiscard]]
-  bool is_finished() const {
-    return render_future.valid() && render_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-  }
 };
