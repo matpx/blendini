@@ -21,8 +21,6 @@ class GfxContext {
 
   raylib::Material default_material;
 
-  int32_t pathtrace_steps = 0;
-
   GfxContext();
   ~GfxContext();
 };

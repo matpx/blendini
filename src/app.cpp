@@ -4,7 +4,7 @@
 
 #include "raymath_helper.hpp"
 
-App::App() : pathtracer(gfx_context.image_swap_pair) {
+App::App() : thread_pool(std::make_shared<BS::thread_pool>(11)), pathtracer(thread_pool, gfx_context.image_swap_pair) {
   const entt::entity sphere_entity = scene.create();
   scene.emplace<std::shared_ptr<raylib::Mesh>>(sphere_entity,
                                                std::make_shared<raylib::Mesh>(raylib::Mesh::Sphere(1, 8, 8)));
@@ -64,14 +64,10 @@ void App::draw_pathtrace() {
     return;
   }
 
-  if (user_input_occured || !pathtracer.is_ready()) {
-    gfx_context.pathtrace_steps = 0;
+  if ((pathtracer.is_idle() && !pathtracer.is_finished()) || user_input_occured) {
     pathtracer.rebuild_tree(scene);
+    pathtracer.start(scene.camera, gfx_context.image_swap_pair->size, 32);
   }
-
-  pathtracer.trace_image(thread_pool, scene.camera, gfx_context.image_swap_pair->size, gfx_context.pathtrace_steps);
-
-  gfx_context.pathtrace_steps++;
 
   gfx_context.image_swap_pair->update_texture();
   gfx_context.image_swap_pair->pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});

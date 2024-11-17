@@ -17,7 +17,7 @@ class App {
   Mode current_mode = Mode::VIEWPORT;
 
  public:
-  BS::thread_pool thread_pool;
+  std::shared_ptr<BS::thread_pool> thread_pool;
 
   GfxContext gfx_context;
 

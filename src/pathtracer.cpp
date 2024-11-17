@@ -19,6 +19,7 @@ static float rand_thread_safe(const float min, const float max) {
   return distribution(generator);
 }
 
+[[nodiscard]]
 inline static std::pair<Vector3f, Vector3f> new_origin_and_dir(const RjmRay &ray) {
   constexpr float offset_length = 1.0f - SMALL_NUMBER;
 
@@ -160,18 +161,52 @@ void Pathtracer::trace_screen(const Vector2i &pathtrace_area, const Matrix4f &in
   }
 }
 
-Pathtracer::Pathtracer(std::shared_ptr<ImageSwapPair> &image_swap_pair) : image_swap_pair(image_swap_pair) {}
+void Pathtracer::trace_image(const Matrix4f &inv_view_proj, const Vector3f &origin, const Vector2i &pathtrace_area,
+                             const int32_t current_step) {
+  pathtrace_buffer.resize(pathtrace_area.x(), pathtrace_area.y(), 3);
+
+  const auto trace_task = [&](const int32_t start, const int32_t end) {
+    trace_screen(pathtrace_area, inv_view_proj, origin, start, end, current_step);
+
+    for (int i_ray = start; i_ray < end; i_ray++) {
+      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+
+      const Color c{
+          .r = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 0) * 255.0f),
+          .g = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 1) * 255.0f),
+          .b = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 2) * 255.0f),
+          .a = 255,
+      };
+
+      image_swap_pair->write_image.DrawPixel(screen_coords.x(), screen_coords.y(), c);
+    }
+  };
+
+  const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
+
+  pool->detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 1024);
+  pool->wait();
+
+  image_swap_pair->swap();
+}
+
+Pathtracer::Pathtracer(std::shared_ptr<BS::thread_pool> &pool, std::shared_ptr<ImageSwapPair> &image_swap_pair)
+    : pool(pool), image_swap_pair(image_swap_pair) {}
 
 Pathtracer::~Pathtracer() {
+  stop();
+
   if (pathtrace_tree.nodes != nullptr) {
     rjm_freeraytree(&pathtrace_tree);
   }
 }
 
 void Pathtracer::rebuild_tree(const Scene &scene) {
+  stop();
+
   sky = scene.sky;
 
-  if (is_ready()) {
+  if (pathtrace_tree.nodes != nullptr) {
     rjm_freeraytree(&pathtrace_tree);
   }
 
@@ -197,42 +232,40 @@ void Pathtracer::rebuild_tree(const Scene &scene) {
   rjm_buildraytree(&pathtrace_tree);
 }
 
-void Pathtracer::trace_image(BS::thread_pool &thread_pool, const raylib::Camera3D &camera,
-                             const Vector2i &pathtrace_area, const int32_t current_step) {
-  assert(pathtrace_tree.nodes != nullptr);
-  assert(IsImageReady(image_swap_pair->write_image));
+void Pathtracer::stop() {
+  if (is_idle()) {
+    return;
+  }
 
-  const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
-  const Matrix4f projectionMatrix =
-      perspective<float>(camera.fovy, ((float)pathtrace_area.x() / (float)pathtrace_area.y()), RL_CULL_DISTANCE_NEAR,
-                         RL_CULL_DISTANCE_FAR);
+  should_stop = true;
+  render_future.wait();
+}
 
-  const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
-  const Vector3f origin = tr(camera.position);
+void Pathtracer::start(const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area, const int32_t steps) {
+  stop();
 
-  pathtrace_buffer.resize(pathtrace_area.x(), pathtrace_area.y(), 3);
+  if (pathtrace_tree.nodes == nullptr || !(IsImageReady(image_swap_pair->write_image))) {
+    assert(false);
+    return;
+  }
 
-  const auto trace_task = [&](const int32_t start, const int32_t end) {
-    trace_screen(pathtrace_area, inv_view_proj, origin, start, end, current_step);
+  should_stop = false;
 
-    for (int i_ray = start; i_ray < end; i_ray++) {
-      const Vector2f screen_coords{i_ray % pathtrace_area.x(), i_ray / pathtrace_area.x()};
+  render_future = std::async([=, this]() {
+    for (int32_t i_step = 0; i_step < steps; i_step++) {
+      if (should_stop) {
+        return;
+      }
 
-      const Color c{
-          .r = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 0) * 255.0f),
-          .g = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 1) * 255.0f),
-          .b = (uint8_t)(pathtrace_buffer.coeff(screen_coords.x(), screen_coords.y(), 2) * 255.0f),
-          .a = 255,
-      };
+      const Matrix4f viewMatrix = lookAt(tr(camera.position), tr(camera.target), tr(camera.up));
+      const Matrix4f projectionMatrix =
+          perspective<float>(camera.fovy, ((float)pathtrace_area.x() / (float)pathtrace_area.y()),
+                             RL_CULL_DISTANCE_NEAR, RL_CULL_DISTANCE_FAR);
 
-      image_swap_pair->write_image.DrawPixel(screen_coords.x(), screen_coords.y(), c);
+      const Matrix4f inv_view_proj = (projectionMatrix * viewMatrix).inverse();
+      const Vector3f origin = tr(camera.position);
+
+      trace_image(inv_view_proj, origin, pathtrace_area, i_step);
     }
-  };
-
-  const int32_t ray_count = pathtrace_area.x() * pathtrace_area.y();
-
-  thread_pool.detach_blocks<int32_t>(0, ray_count, trace_task, ray_count / 1024);
-  thread_pool.wait();
-
-  image_swap_pair->swap();
+  });
 }
