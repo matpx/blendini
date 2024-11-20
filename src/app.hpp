@@ -28,6 +28,8 @@ class App {
 
   bool user_input_occured = true;
 
+  int32_t max_pathtrace_step = 128;
+
   App(const App &) = delete;
   App(App &&) = delete;
 

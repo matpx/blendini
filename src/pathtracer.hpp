@@ -33,6 +33,9 @@ class Pathtracer {
   Eigen::Tensor<float, 3> pathtrace_buffer;
   Sky sky = {};
 
+  std::atomic<Status> status = Status::STOPPED;
+  std::atomic<int32_t> current_step = 0;
+
   std::future<void> render_future;
 
  private:
@@ -58,10 +61,21 @@ class Pathtracer {
   Pathtracer(Pathtracer &&) = delete;
   ~Pathtracer();
 
-  Status status = Status::STOPPED;
-
   void rebuild_tree(const Scene &scene);
 
-  void stop();
-  void start(const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area, const int32_t steps);
+  void start(const raylib::Camera3D &camera, const Eigen::Vector2i &pathtrace_area, const int32_t max_pathtrace_step);
+
+  void stop_and_join();
+
+  void request_stop() { status = Status::ABORT; }
+
+  [[nodiscard]]
+  constexpr Status get_status() const {
+    return status;
+  }
+
+  [[nodiscard]]
+  constexpr int32_t get_current_step() const {
+    return current_step;
+  }
 };

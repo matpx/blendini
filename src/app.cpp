@@ -5,7 +5,7 @@
 #include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
-App::App() : thread_pool(std::make_shared<BS::thread_pool>(11)), pathtracer(thread_pool, gfx_context.image_swap_pair) {
+App::App() : thread_pool(std::make_shared<BS::thread_pool>()), pathtracer(thread_pool, gfx_context.image_swap_pair) {
   const entt::entity sphere_entity = scene.create();
   scene.emplace<std::shared_ptr<raylib::Mesh>>(sphere_entity,
                                                std::make_shared<raylib::Mesh>(raylib::Mesh::Sphere(1, 8, 8)));
@@ -33,6 +33,7 @@ void App::process_inputs() {
   }
 
   if (raylib::Keyboard::IsKeyPressed(KEY_F1)) {
+    pathtracer.stop_and_join();
     current_mode = current_mode == Mode::VIEWPORT ? Mode::PATHTRACE : Mode::VIEWPORT;
   }
 }
@@ -61,14 +62,25 @@ void App::draw_pathtrace() {
     return;
   }
 
+  const Pathtracer::Status pathtracer_status = pathtracer.get_status();
+
   if (user_input_occured) {
-    pathtracer.status = Pathtracer::Status::ABORT;
-  } else if (pathtracer.status == Pathtracer::Status::STOPPED || pathtracer.status == Pathtracer::Status::ABORT) {
+    pathtracer.request_stop();
+  } else if (pathtracer_status == Pathtracer::Status::STOPPED || pathtracer_status == Pathtracer::Status::ABORT) {
     pathtracer.rebuild_tree(scene);
-    pathtracer.start(scene.camera, gfx_context.image_swap_pair->size, 128);
+    pathtracer.start(scene.camera, gfx_context.image_swap_pair->size, max_pathtrace_step);
   } else {
-    gfx_context.image_swap_pair->update_texture();
+    if (pathtracer_status != Pathtracer::Status::FINISHED) {
+      gfx_context.image_swap_pair->update_texture();
+    }
+
     gfx_context.image_swap_pair->pathtrace_texture.Draw(0, 0, {255, 255, 255, 255});
+
+    raylib::DrawText(TextFormat("step: %d", pathtracer.get_current_step()), 10, 40, 20, raylib::Color::Black());
+
+    if (pathtracer_status == Pathtracer::Status::FINISHED) {
+      raylib::DrawText(TextFormat("finished!"), 10, 60, 20, raylib::Color::Black());
+    }
   }
 }
 
@@ -87,7 +99,7 @@ void App::update() {
   process_inputs();
 
   gfx_context.window.BeginDrawing();
-  gfx_context.window.ClearBackground(GRAY);
+  gfx_context.window.ClearBackground(raylib::Color::Gray());
 
   draw_viewport();
   draw_pathtrace();
