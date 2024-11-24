@@ -169,6 +169,7 @@ namespace
         const FT_Glyph_Metrics* LoadGlyph(uint32_t in_codepoint);
         const FT_Bitmap*        RenderGlyphAndGetInfo(GlyphInfo* out_glyph_info);
         void                    BlitGlyph(const FT_Bitmap* ft_bitmap, uint32_t* dst, uint32_t dst_pitch, unsigned char* multiply_table = nullptr);
+        FreeTypeFont()          { memset(this, 0, sizeof(*this)); }
         ~FreeTypeFont()         { CloseFont(); }
 
         // [Internals]
@@ -681,8 +682,6 @@ bool ImFontAtlasBuildWithFreeTypeEx(FT_Library ft_library, ImFontAtlas* atlas, u
     for (int src_i = 0; src_i < src_tmp_array.Size; src_i++)
     {
         ImFontBuildSrcDataFT& src_tmp = src_tmp_array[src_i];
-        if (src_tmp.GlyphsCount == 0)
-            continue;
 
         // When merging fonts with MergeMode=true:
         // - We can have multiple input fonts writing into a same destination font.
@@ -693,6 +692,9 @@ bool ImFontAtlasBuildWithFreeTypeEx(FT_Library ft_library, ImFontAtlas* atlas, u
         const float ascent = src_tmp.Font.Info.Ascender;
         const float descent = src_tmp.Font.Info.Descender;
         ImFontAtlasBuildSetupFont(atlas, dst_font, &cfg, ascent, descent);
+
+        if (src_tmp.GlyphsCount == 0)
+            continue;
         const float font_off_x = cfg.GlyphOffset.x;
         const float font_off_y = cfg.GlyphOffset.y + IM_ROUND(dst_font->Ascent);
 

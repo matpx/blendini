@@ -4,6 +4,7 @@
 // Implemented features:
 //  [X] Renderer: User texture binding. Use 'ID3D10ShaderResourceView*' as ImTextureID. Read the FAQ about ImTextureID!
 //  [X] Renderer: Large meshes support (64k+ vertices) with 16-bit indices.
+//  [X] Renderer: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable'.
 
 // You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
 // Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
@@ -26,7 +27,7 @@ IMGUI_IMPL_API void     ImGui_ImplDX10_NewFrame();
 IMGUI_IMPL_API void     ImGui_ImplDX10_RenderDrawData(ImDrawData* draw_data);
 
 // Use if you want to reset your rendering device without losing Dear ImGui state.
-IMGUI_IMPL_API void     ImGui_ImplDX10_InvalidateDeviceObjects();
 IMGUI_IMPL_API bool     ImGui_ImplDX10_CreateDeviceObjects();
+IMGUI_IMPL_API void     ImGui_ImplDX10_InvalidateDeviceObjects();
 
 #endif // #ifndef IMGUI_DISABLE

@@ -2,6 +2,7 @@
 
 #include <rlImGui/rlImGui.h>
 
+#include "editor.hpp"
 #include "pathtracer.hpp"
 #include "raymath_helper.hpp"
 
@@ -87,8 +88,7 @@ void App::draw_pathtrace() {
 void App::draw_viewport_ui() {
   rlImGuiBegin();
 
-  // ImGui::Begin("My First Tool", nullptr, ImGuiWindowFlags_MenuBar);
-  // ImGui::End();
+  editor::draw();
 
   rlImGuiEnd();
 

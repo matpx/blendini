@@ -1,5 +1,6 @@
 #include "gfx_context.hpp"
 
+#include <imgui.h>
 #include <rlImGui/rlImGui.h>
 
 GfxContext::GfxContext()
@@ -8,6 +9,7 @@ GfxContext::GfxContext()
   window.SetTargetFPS(60);
 
   rlImGuiSetup(true);
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 }
 
 GfxContext::~GfxContext() { rlImGuiShutdown(); }
